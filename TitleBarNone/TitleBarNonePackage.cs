@@ -17,9 +17,24 @@ using Microsoft.Win32;
 using Task = System.Threading.Tasks.Task;
 using SettingsPageGrid = Atma.TitleBarNone.Settings.SettingsPageGrid;
 using System.Collections.Generic;
+using Atma.TitleBarNone.Resolvers;
 
-namespace TitleBarNone
+namespace Atma.TitleBarNone
 {
+	public enum VsEditingMode
+	{
+		Nothing,
+		Document,
+		Solution
+	}
+
+	public enum VsMode
+	{
+		Design,
+		Running,
+		Debug
+	}
+
 	[PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 	[InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
 	[Guid(PackageGuidString)]
@@ -39,15 +54,24 @@ namespace TitleBarNone
 		public const string DefaultPatternIfDocumentOpen = "$document-name - $ide-name";
 		public const string DefaultPatternIfSolutionOpen = "$solution-name ${$ide-mode }- $ide-name";
 
-		protected enum VsEditingMode
-		{
-			Nothing,
-			Document,
-			Solution
-		}
-
 		public TitleBarNonePackage()
 		{
+			m_Resolvers = new List<Resolver>
+			{
+				IDEResolver.Create(DTE, OnIDEChanged),
+				SolutionResolver.Create(DTE, OnSolutionChanged)
+			};
+		}
+
+		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
+		{
+		}
+
+		private void OnIDEChanged(DTE2 dte, IDEResolver.CallbackReason reason)
+		{
+			if (reason == IDEResolver.CallbackReason.ModeChanged)
+			{
+			}
 		}
 
 		public DTE2 DTE { get; private set; }
@@ -75,9 +99,9 @@ namespace TitleBarNone
 			}
 		}
 
-		private string PatternIfNothingOpened => SettingsFrames.Where(x => x.PatternIfNothingOpened != null).FirstOrDefault()?.PatternIfNothingOpened ?? "";
-		private string PatternIfDocumentOpened => SettingsFrames.Where(x => x.PatternIfDocumentOpened != null).FirstOrDefault()?.PatternIfDocumentOpened ?? "";
-		private string PatternIfSolutionOpened => SettingsFrames.Where(x => x.PatternIfSolutionOpened != null).FirstOrDefault()?.PatternIfSolutionOpened ?? "";
+		private string PatternIfNothingOpened => SettingsFrames.Where(x => x.FormatIfNothingOpened != null).FirstOrDefault()?.FormatIfNothingOpened?.Pattern ?? "";
+		private string PatternIfDocumentOpened => SettingsFrames.Where(x => x.FormatIfDocumentOpened != null).FirstOrDefault()?.FormatIfDocumentOpened?.Pattern ?? "";
+		private string PatternIfSolutionOpened => SettingsFrames.Where(x => x.FormatIfSolutionOpened != null).FirstOrDefault()?.FormatIfSolutionOpened?.Pattern ?? "";
 
 		internal SettingsPageGrid UISettings { get; private set; }
 
@@ -94,7 +118,7 @@ namespace TitleBarNone
 			//m_WindowEvents.WindowCreated += WindowEvents_WindowCreated;
 
 			m_SolutionEvents = DTE.Events.SolutionEvents;
-			m_SolutionEvents.Opened += SolutionUpdated;
+			m_SolutionEvents.Opened += OnSolutionOpened;
 			m_SolutionEvents.AfterClosing += SolutionUpdated;
 
 			// switch to UI thread
@@ -111,13 +135,13 @@ namespace TitleBarNone
 			var settings = sender as SettingsPageGrid;
 
 			bool requiresUpdate =
-				(m_SettingsFromVs.PatternIfNothingOpened != settings.PatternIfNothingOpen) ||
-				(m_SettingsFromVs.PatternIfDocumentOpened != settings.PatternIfDocumentOpen) ||
-				(m_SettingsFromVs.PatternIfSolutionOpened != settings.PatternIfSolutionOpen);
+				(m_SettingsFromVs.FormatIfNothingOpened != settings.PatternIfNothingOpen) ||
+				(m_SettingsFromVs.FormatIfDocumentOpened != settings.PatternIfDocumentOpen) ||
+				(m_SettingsFromVs.FormatIfSolutionOpened != settings.PatternIfSolutionOpen);
 
-			m_SettingsFromVs.PatternIfNothingOpened = settings.PatternIfNothingOpen;
-			m_SettingsFromVs.PatternIfDocumentOpened = settings.PatternIfDocumentOpen;
-			m_SettingsFromVs.PatternIfSolutionOpened = settings.PatternIfSolutionOpen;
+			m_SettingsFromVs.FormatIfNothingOpened = settings.PatternIfNothingOpen;
+			m_SettingsFromVs.FormatIfDocumentOpened = settings.PatternIfDocumentOpen;
+			m_SettingsFromVs.FormatIfSolutionOpened = settings.PatternIfSolutionOpen;
 
 			if (requiresUpdate)
 				UpdateTitle();
@@ -140,6 +164,21 @@ namespace TitleBarNone
 			UpdateTitle();
 		}
 
+		private void OnSolutionOpened()
+		{
+			// create a filesystem informant
+			var directory = System.IO.Path.GetDirectoryName(DTE.Solution.FileName);
+			var filename = ".titlebar";
+			var config_file = System.IO.Path.Combine(directory, filename);
+
+			if (System.IO.File.Exists(config_file))
+			{
+				m_SettingsFromSolutionDir.Reset(new Settings.FileSystemChangeProvider(config_file));
+			}
+
+			// loop through custom settings
+		}
+
 		private void SolutionUpdated()
 		{
 			UpdateTitle();
@@ -148,11 +187,58 @@ namespace TitleBarNone
 		private void UpdateTitle()
 		{
 			string pattern = Pattern;
+			string transformed = "";
+
+			var state = new Resolvers.VsState()
+			{
+				Mode = /* do this */,
+				Solution = DTE.Solution
+			};
+
+			// begin pattern parsing
+			for (int i = 0; i != pattern.Length; ++i)
+			{
+				// escape sequences
+				if (pattern[i] == '\\')
+				{
+					++i;
+					if (i == pattern.Length)
+						break;
+					transformed += pattern[i];
+				}
+				// predicates
+				else if (pattern[i] == '?')
+				{
+					++i;
+					var tag_start = i;
+					while (i != pattern.Length && (pattern[i] >= 'a' && pattern[i] <= 'z' || pattern[i] == '-'))
+						++i;
+					
+					//bool tag_present = 
+				}
+				// dollars
+				else if (pattern[i] == '$')
+				{
+					++i;
+					var tag_start = i;
+					while (i != pattern.Length && (pattern[i] >= 'a' && pattern[i] <= 'z' || pattern[i] == '-'))
+						++i;
+					var tag_end = i;
+
+					var tag = pattern.Substring(tag_start, tag_end - tag_start);
+
+					var resolved = m_Resolvers
+						.First(x => x.Applicable(tag))
+						.Resolve(state, tag);
+				}
+			}
+
 			ChangeWindowTitle(pattern);
 		}
 
 		private void ChangeWindowTitle(string title)
 		{
+			return;
 			if (DTE.MainWindow == null)
 				return;
 
@@ -175,12 +261,38 @@ namespace TitleBarNone
 		private SolutionEvents m_SolutionEvents;
 		private WindowEvents m_WindowEvents;
 		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
+		private VsMode m_Mode = VsMode.Design;
 
-		class SettingsFrame
+		class SettingsFrame : IDisposable
 		{
-			public string PatternIfNothingOpened = null;
-			public string PatternIfDocumentOpened = null;
-			public string PatternIfSolutionOpened = null;
+			public Settings.TitleBarFormat FormatIfNothingOpened = null;
+			public Settings.TitleBarFormat FormatIfDocumentOpened = null;
+			public Settings.TitleBarFormat FormatIfSolutionOpened = null;
+
+			public void Reset(Settings.ChangeProvider changeProvider)
+			{
+				if (m_ChangeProvider != null)
+					m_ChangeProvider.Changed -= OnSettingsChanged;
+
+				m_ChangeProvider = changeProvider;
+
+				if (m_ChangeProvider != null)
+					m_ChangeProvider.Changed += OnSettingsChanged;
+			}
+
+			private void OnSettingsChanged(Settings.TitleBarFormatTriplet triplet)
+			{
+				FormatIfNothingOpened = triplet.FormatIfNothingOpened;
+				FormatIfDocumentOpened = triplet.FormatIfDocumentOpened;
+				FormatIfSolutionOpened = triplet.FormatIfSolutionOpened;
+			}
+
+			public void Dispose()
+			{
+				m_ChangeProvider.Dispose();
+			}
+
+			private Settings.ChangeProvider m_ChangeProvider;
 		}
 
 		private SettingsFrame m_SettingsFromVs = new SettingsFrame();
@@ -188,5 +300,6 @@ namespace TitleBarNone
 		private SettingsFrame m_SettingsFromUserDir = new SettingsFrame();
 		private SettingsFrame m_SettingsFromSolutionDir = new SettingsFrame();
 		private List<SettingsFrame> m_SettingsStack = new List<SettingsFrame>();
+		private List<Resolvers.Resolver> m_Resolvers;
 	}
 }

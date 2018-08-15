@@ -23,7 +23,7 @@
     <ProjectGuid>{4A533562-A7B9-4205-A74C-7D7A7D01E566}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>TitleBarNone</RootNamespace>
+    <RootNamespace>Atma.TitleBarNone</RootNamespace>
     <AssemblyName>TitleBarNone</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
@@ -63,6 +63,10 @@
     <Compile Include="Editors\FilePickerEditor.cs" />
     <Compile Include="Editors\PatternEditor.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Resolvers\IDEresolver.cs" />
+    <Compile Include="Resolvers\Resolver.cs" />
+    <Compile Include="Resolvers\SolutionResolver.cs" />
+    <Compile Include="Settings\ChangeProvider.cs" />
     <Compile Include="Settings\Settings.cs" />
     <Compile Include="Settings\SettingsPageGrid.cs">
       <SubType>Component</SubType>

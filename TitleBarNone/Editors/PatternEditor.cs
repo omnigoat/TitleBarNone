@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Drawing.Design;
 using System.Windows.Forms.Design;
 using System.Windows.Forms;
-using TitleBarNone;
 
 namespace Atma.TitleBarNone.Editors
 {

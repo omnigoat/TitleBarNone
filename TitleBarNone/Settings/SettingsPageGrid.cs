@@ -2,7 +2,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.Shell;
-using TitleBarNone;
 
 //http://stackoverflow.com/questions/24291249/dialogpage-string-array-not-persisted
 //http://www.codeproject.com/Articles/351172/CodeStash-a-journey-into-the-dark-side-of-Visual-S
@@ -17,7 +16,7 @@ namespace Atma.TitleBarNone.Settings
 		[Description("Default: [ideName]. See 'Supported Tags' section on the left for more guidance.")]
 		[DefaultValue(TitleBarNonePackage.DefaultPatternIfNothingOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
-		public string PatternIfNothingOpen { get; set; } = TitleBarNonePackage.DefaultPatternIfNothingOpen;
+		public TitleBarFormat PatternIfNothingOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfNothingOpen);
 
 		[Category("Patterns")]
 		[DisplayName("Document (no solution) open")]
@@ -25,7 +24,7 @@ namespace Atma.TitleBarNone.Settings
 		[DefaultValue(TitleBarNonePackage.DefaultPatternIfDocumentOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
 		[Editors.PreviewRequires(Editors.PreviewRequiresAttribute.Requirement.Document)]
-		public string PatternIfDocumentOpen { get; set; } = TitleBarNonePackage.DefaultPatternIfDocumentOpen;
+		public TitleBarFormat PatternIfDocumentOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfDocumentOpen);
 
 		[Category("Patterns")]
 		[DisplayName("Solution in design mode")]
@@ -33,7 +32,7 @@ namespace Atma.TitleBarNone.Settings
 		[DefaultValue(TitleBarNonePackage.DefaultPatternIfSolutionOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
 		[Editors.PreviewRequires(Editors.PreviewRequiresAttribute.Requirement.Solution)]
-		public string PatternIfSolutionOpen { get; set; } = TitleBarNonePackage.DefaultPatternIfSolutionOpen;
+		public TitleBarFormat PatternIfSolutionOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfSolutionOpen);
 
 #if false
 		[Category("Source Control")]

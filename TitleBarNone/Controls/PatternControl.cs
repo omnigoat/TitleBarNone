@@ -9,7 +9,6 @@ using System.Windows.Forms;
 using System.Windows.Forms.Design;
 using System.IO;
 using EnvDTE;
-using TitleBarNone;
 
 namespace Atma.TitleBarNone.Controls
 {
