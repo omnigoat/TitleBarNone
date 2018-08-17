@@ -13,20 +13,26 @@ namespace Atma.TitleBarNone.Resolvers
 			SolutionClosed
 		}
 
+		internal static Resolver Create(DTE2 dte, Action<CallbackReason> callback = null)
+		{
+			return new SolutionResolver(dte, callback);
+		}
+
 		public SolutionResolver(DTE2 dte, Action<CallbackReason> callback)
 			: base(new [] { "solution", "solution-name", "solution-dir" })
 		{
 			m_DTE = dte;
 			m_Callback = callback;
 
-			m_DTE.Events.SolutionEvents.Opened += () => m_Callback(CallbackReason.SolutionOpened);
-			m_DTE.Events.SolutionEvents.AfterClosing += () => m_Callback(CallbackReason.SolutionClosed);
+			m_DTE.Events.SolutionEvents.Opened += OnSolutionOpened;
+			m_DTE.Events.SolutionEvents.AfterClosing += OnSolutionClosed;
 		}
 
-		public static Resolver Create(DTE2 dte, Action<CallbackReason> callback)
-		{
-			return new SolutionResolver(dte, callback);
-		}
+		public delegate void SolutionOpenedDelegate(string filepath);
+		public delegate void SolutionClosedDelegate();
+
+		public event SolutionOpenedDelegate SolutionOpened;
+		public event SolutionClosedDelegate SolutionClosed;
 
 		public override bool ResolveBoolean(VsState state, string tag)
 		{
@@ -43,12 +49,19 @@ namespace Atma.TitleBarNone.Resolvers
 				return "lmao";
 		}
 
+		private void OnSolutionOpened()
+		{
+			SolutionOpened.Invoke(m_DTE.Solution.FileName);
+			m_Callback?.Invoke(CallbackReason.SolutionOpened);
+		}
+
+		private void OnSolutionClosed()
+		{
+			SolutionClosed.Invoke();
+			m_Callback?.Invoke(CallbackReason.SolutionClosed);
+		}
+
 		private DTE2 m_DTE;
 		private Action<CallbackReason> m_Callback;
-
-		internal static Resolver Create(DTE2 dTE, object onSolutionChanged)
-		{
-			throw new NotImplementedException();
-		}
 	}
 }

@@ -5,7 +5,7 @@ namespace Atma.TitleBarNone.Resolvers
 {
 	public struct VsState
 	{
-		public VsMode Mode;
+		public dbgDebugMode Mode;
 		public EnvDTE.Solution Solution;
 	}
 

@@ -28,13 +28,6 @@ namespace Atma.TitleBarNone
 		Solution
 	}
 
-	public enum VsMode
-	{
-		Design,
-		Running,
-		Debug
-	}
-
 	[PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 	[InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
 	[Guid(PackageGuidString)]
@@ -65,13 +58,15 @@ namespace Atma.TitleBarNone
 
 		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
 		{
+			UpdateTitle();
 		}
 
-		private void OnIDEChanged(DTE2 dte, IDEResolver.CallbackReason reason)
+		private void OnIDEChanged(IDEResolver.CallbackReason reason, IDEResolver.IDEState state)
 		{
 			if (reason == IDEResolver.CallbackReason.ModeChanged)
-			{
-			}
+				m_Mode = state.Mode;
+
+			UpdateTitle();
 		}
 
 		public DTE2 DTE { get; private set; }
@@ -189,9 +184,9 @@ namespace Atma.TitleBarNone
 			string pattern = Pattern;
 			string transformed = "";
 
-			var state = new Resolvers.VsState()
+			var state = new VsState()
 			{
-				Mode = /* do this */,
+				Mode = m_Mode,
 				Solution = DTE.Solution
 			};
 
@@ -261,7 +256,7 @@ namespace Atma.TitleBarNone
 		private SolutionEvents m_SolutionEvents;
 		private WindowEvents m_WindowEvents;
 		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
-		private VsMode m_Mode = VsMode.Design;
+		private dbgDebugMode m_Mode = dbgDebugMode.Design;
 
 		class SettingsFrame : IDisposable
 		{
