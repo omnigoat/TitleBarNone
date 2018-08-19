@@ -43,17 +43,12 @@ namespace Atma.TitleBarNone
 		public const string SolutionNameTag = "solution-name";
 		public const string SolutionPatternTag = "solution-pattern";
 
-		public const string DefaultPatternIfNothingOpen = "$ide-name";
-		public const string DefaultPatternIfDocumentOpen = "$document-name - $ide-name";
-		public const string DefaultPatternIfSolutionOpen = "$solution-name ${$ide-mode }- $ide-name";
+		public const string DefaultPatternIfNothingOpen = "hooray:|$ide-name|";
+		public const string DefaultPatternIfDocumentOpen = "hooray:|$document-name - $ide-name|";
+		public const string DefaultPatternIfSolutionOpen = "hooray:|$solution-name?ide-mode{ $} - $ide-name|";
 
 		public TitleBarNonePackage()
 		{
-			m_Resolvers = new List<Resolver>
-			{
-				IDEResolver.Create(DTE, OnIDEChanged),
-				SolutionResolver.Create(DTE, OnSolutionChanged)
-			};
 		}
 
 		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
@@ -106,8 +101,17 @@ namespace Atma.TitleBarNone
 			// initialize the DTE and bind events
 			DTE = await GetServiceAsync(typeof(DTE)) as DTE2;
 
-			DTE.Events.DTEEvents.OnStartupComplete += DTEEvents_OnStartupComplete;
-			DTE.Events.DTEEvents.ModeChanged += DTEEvents_ModeChanged;
+			var sr = SolutionResolver.Create(DTE, OnSolutionChanged);
+
+			m_Resolvers = new List<Resolver>
+			{
+				IDEResolver.Create(DTE, OnIDEChanged),
+				sr
+			};
+
+
+			//DTE.Events.DTEEvents.OnStartupComplete += DTEEvents_OnStartupComplete;
+			//DTE.Events.DTEEvents.ModeChanged += DTEEvents_ModeChanged;
 
 			m_WindowEvents = DTE.Events.WindowEvents;
 			//m_WindowEvents.WindowCreated += WindowEvents_WindowCreated;
@@ -182,7 +186,6 @@ namespace Atma.TitleBarNone
 		private void UpdateTitle()
 		{
 			string pattern = Pattern;
-			string transformed = "";
 
 			var state = new VsState()
 			{
@@ -190,8 +193,19 @@ namespace Atma.TitleBarNone
 				Solution = DTE.Solution
 			};
 
+			int i = 0;
+			if (ParseImpl(out string transformed, state, pattern, ref i, null))
+			{
+				ChangeWindowTitle(transformed);
+			}
+		}
+
+		private bool ParseImpl(out string transformed, VsState state, string pattern, ref int i, string singleDollar)
+		{
+			transformed = "";
+
 			// begin pattern parsing
-			for (int i = 0; i != pattern.Length; ++i)
+			while (i != pattern.Length)
 			{
 				// escape sequences
 				if (pattern[i] == '\\')
@@ -200,40 +214,116 @@ namespace Atma.TitleBarNone
 					if (i == pattern.Length)
 						break;
 					transformed += pattern[i];
+					++i;
 				}
 				// predicates
-				else if (pattern[i] == '?')
+				else if (pattern[i] == '?' && ParseQuestion(out string r, state, pattern, ref i, singleDollar))
 				{
-					++i;
-					var tag_start = i;
-					while (i != pattern.Length && (pattern[i] >= 'a' && pattern[i] <= 'z' || pattern[i] == '-'))
-						++i;
-					
-					//bool tag_present = 
+					transformed += r;
 				}
 				// dollars
-				else if (pattern[i] == '$')
+				else if (pattern[i] == '$' && ParseDollar(out string r2, state, pattern, ref i, singleDollar))
 				{
+					transformed += r2;
+				}
+				else
+				{
+					transformed += pattern[i];
 					++i;
-					var tag_start = i;
-					while (i != pattern.Length && (pattern[i] >= 'a' && pattern[i] <= 'z' || pattern[i] == '-'))
-						++i;
-					var tag_end = i;
-
-					var tag = pattern.Substring(tag_start, tag_end - tag_start);
-
-					var resolved = m_Resolvers
-						.First(x => x.Applicable(tag))
-						.Resolve(state, tag);
 				}
 			}
 
-			ChangeWindowTitle(pattern);
+			return true;
+		}
+
+
+		private bool ParseQuestion(out string result, VsState state, string pattern, ref int i, string singleDollar)
+		{
+			var tag = new string(pattern
+				.Substring(i + 1)
+				.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
+				.ToArray());
+
+			i += 1 + tag.Length;
+
+			bool valid = m_Resolvers
+				.FirstOrDefault(x => x.Applicable(tag))
+				?.ResolveBoolean(state, tag) ?? false;
+
+			if (i == pattern.Length)
+			{
+				result = null;
+				return valid;
+			}
+
+			// look for braced group {....}, and skip if question was bad
+			if (pattern[i] == '{')
+			{
+				if (!valid)
+				{
+					while (i != pattern.Length)
+					{
+						++i;
+						if (pattern[i] == '}')
+						{
+							++i;
+							break;
+						}
+					}
+
+					result = null;
+					return false;
+				}
+				else
+				{
+					var transformed_tag = m_Resolvers
+						.FirstOrDefault(x => x.Applicable(tag))
+						?.Resolve(state, tag);
+
+					var inner = new string(pattern
+						.Substring(i + 1)
+						.TakeWhile(x => x != '}')
+						.ToArray());
+
+					i += 1 + inner.Length + 1;
+
+					int j = 0;
+					ParseImpl(out result, state, inner, ref j, transformed_tag);
+				}
+			}
+			else
+			{
+				result = null;
+				return false;
+			}
+
+			return true;
+		}
+
+		private bool ParseDollar(out string result, VsState state, string pattern, ref int i, string singleDollar)
+		{
+			var tag = new string(pattern
+				.Substring(i + 1)
+				.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
+				.ToArray());
+
+			i += 1 + tag.Length;
+
+			if (tag.Length == 0 && singleDollar != null)
+			{
+				result = singleDollar;
+				return true;
+			}
+
+			result = m_Resolvers
+				.FirstOrDefault(x => x.Applicable(tag))
+				?.Resolve(state, tag);
+
+			return result != null;
 		}
 
 		private void ChangeWindowTitle(string title)
 		{
-			return;
 			if (DTE.MainWindow == null)
 				return;
 
@@ -256,7 +346,7 @@ namespace Atma.TitleBarNone
 		private SolutionEvents m_SolutionEvents;
 		private WindowEvents m_WindowEvents;
 		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
-		private dbgDebugMode m_Mode = dbgDebugMode.Design;
+		private dbgDebugMode m_Mode = dbgDebugMode.dbgDesignMode;
 
 		class SettingsFrame : IDisposable
 		{

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using EnvDTE;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Atma.TitleBarNone.Resolvers

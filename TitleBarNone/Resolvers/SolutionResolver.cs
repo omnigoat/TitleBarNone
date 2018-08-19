@@ -2,6 +2,7 @@
 using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.IO;
+using System.Linq;
 
 namespace Atma.TitleBarNone.Resolvers
 {
@@ -42,25 +43,26 @@ namespace Atma.TitleBarNone.Resolvers
 		public override string Resolve(VsState state, string tag)
 		{
 			if (tag == "solution-name" && state.Solution?.FullName != null)
-				return state.Solution.FullName;
+				return Path.GetFileNameWithoutExtension(state.Solution.FullName);
 			else if (tag == "solution-dir")
-				return Path.GetDirectoryName(state.Solution.FileName);
+				return Path.GetFileName(Path.GetDirectoryName(state.Solution.FileName)) + "\\";
 			else
-				return "lmao";
+				throw new InvalidOperationException();
 		}
 
 		private void OnSolutionOpened()
 		{
-			SolutionOpened.Invoke(m_DTE.Solution.FileName);
+			SolutionOpened?.Invoke(m_DTE.Solution.FileName);
 			m_Callback?.Invoke(CallbackReason.SolutionOpened);
 		}
 
 		private void OnSolutionClosed()
 		{
-			SolutionClosed.Invoke();
+			SolutionClosed?.Invoke();
 			m_Callback?.Invoke(CallbackReason.SolutionClosed);
 		}
 
+		
 		private DTE2 m_DTE;
 		private Action<CallbackReason> m_Callback;
 	}
