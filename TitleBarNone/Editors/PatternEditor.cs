@@ -38,11 +38,8 @@ namespace Atma.TitleBarNone.Editors
 
 		public override object EditValue(ITypeDescriptorContext context, IServiceProvider provider, object value)
 		{
-			if (provider != null)
-			{
-				m_EditorService = provider.GetService(typeof(IWindowsFormsEditorService)) as IWindowsFormsEditorService;
-				package = provider as TitleBarNonePackage;
-			}
+			Controls.PatternControl ctl = new Controls.PatternControl();
+			
 
 			object page = context.Instance;
 
@@ -55,30 +52,6 @@ namespace Atma.TitleBarNone.Editors
 				{
 					defVal = ((DefaultValueAttribute)attr[0]).Value.ToString();
 				}
-			}
-
-			PreviewRequiresAttribute.Requirement req = PreviewRequiresAttribute.Requirement.None;
-			{
-				var attr = fi.GetCustomAttributes(typeof(PreviewRequiresAttribute), false);
-				if (attr != null && attr.Length > 0)
-				{
-					req = ((PreviewRequiresAttribute)attr[0]).Require;
-				}
-			}
-
-			if (m_EditorService != null)
-			{
-				Controls.PatternControl ctl = new Controls.PatternControl(package, m_EditorService)
-				{
-					Pattern = ep,
-					PreviewRequires = req,
-					DefaultPattern = defVal,
-					BorderStyle = BorderStyle.None
-				};
-
-				m_EditorService.DropDownControl(ctl);
-
-				ep = ctl.Pattern;
 			}
 
 			return ep;

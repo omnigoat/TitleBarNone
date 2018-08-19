@@ -51,19 +51,6 @@ namespace Atma.TitleBarNone
 		{
 		}
 
-		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
-		{
-			UpdateTitle();
-		}
-
-		private void OnIDEChanged(IDEResolver.CallbackReason reason, IDEResolver.IDEState state)
-		{
-			if (reason == IDEResolver.CallbackReason.ModeChanged)
-				m_Mode = state.Mode;
-
-			UpdateTitle();
-		}
-
 		public DTE2 DTE { get; private set; }
 		public string Pattern
 		{
@@ -95,6 +82,7 @@ namespace Atma.TitleBarNone
 
 		internal SettingsPageGrid UISettings { get; private set; }
 
+		private bool GitIsRequired => SettingsFrames.Any(x => x.FormatIfSolutionOpened.Pattern.Contains("$git"));
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
@@ -110,12 +98,13 @@ namespace Atma.TitleBarNone
 			};
 
 
-			//DTE.Events.DTEEvents.OnStartupComplete += DTEEvents_OnStartupComplete;
-			//DTE.Events.DTEEvents.ModeChanged += DTEEvents_ModeChanged;
+			// get UI settings hooks
+			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
+			UISettings.SettingsChanged += VsSettingsChanged;
+			VsSettingsChanged(UISettings, EventArgs.Empty);
+
 
 			m_WindowEvents = DTE.Events.WindowEvents;
-			//m_WindowEvents.WindowCreated += WindowEvents_WindowCreated;
-
 			m_SolutionEvents = DTE.Events.SolutionEvents;
 			m_SolutionEvents.Opened += OnSolutionOpened;
 			m_SolutionEvents.AfterClosing += SolutionUpdated;
@@ -123,10 +112,6 @@ namespace Atma.TitleBarNone
 			// switch to UI thread
 			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
-			// get UI settings hooks
-			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
-			UISettings.SettingsChanged += VsSettingsChanged;
-			VsSettingsChanged(UISettings, EventArgs.Empty);
 		}
 
 		private void VsSettingsChanged(object sender, EventArgs e)
@@ -177,6 +162,31 @@ namespace Atma.TitleBarNone
 
 			// loop through custom settings
 		}
+
+		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
+		{
+			// figure out if we're in a git repository
+			if (reason == SolutionResolver.CallbackReason.SolutionOpened)
+			{
+				if (GitResolver.Required(out string gitpath, System.IO.Path.GetDirectoryName(DTE.Solution.FileName)))
+				{
+					m_Resolvers.Add(new GitResolver(gitpath));
+				}
+			}
+
+			UpdateTitle();
+		}
+
+		private void OnIDEChanged(IDEResolver.CallbackReason reason, IDEResolver.IDEState state)
+		{
+			if (reason == IDEResolver.CallbackReason.ModeChanged)
+				m_Mode = state.Mode;
+
+			UpdateTitle();
+		}
+
+
+
 
 		private void SolutionUpdated()
 		{

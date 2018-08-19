@@ -25,8 +25,9 @@ namespace Atma.TitleBarNone.Resolvers
 			m_DTE = dte;
 			m_Callback = callback;
 
-			m_DTE.Events.SolutionEvents.Opened += OnSolutionOpened;
-			m_DTE.Events.SolutionEvents.AfterClosing += OnSolutionClosed;
+			m_SolutionEvents = m_DTE.Events.SolutionEvents;
+			m_SolutionEvents.Opened += OnSolutionOpened;
+			m_SolutionEvents.AfterClosing += OnSolutionClosed;
 		}
 
 		public delegate void SolutionOpenedDelegate(string filepath);
@@ -64,6 +65,7 @@ namespace Atma.TitleBarNone.Resolvers
 
 		
 		private DTE2 m_DTE;
+		private EnvDTE.SolutionEvents m_SolutionEvents;
 		private Action<CallbackReason> m_Callback;
 	}
 }

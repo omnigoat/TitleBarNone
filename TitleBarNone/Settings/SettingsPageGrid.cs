@@ -34,6 +34,12 @@ namespace Atma.TitleBarNone.Settings
 		[Editors.PreviewRequires(Editors.PreviewRequiresAttribute.Requirement.Solution)]
 		public TitleBarFormat PatternIfSolutionOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfSolutionOpen);
 
+		[Category("Source Control Patterns")]
+		[DisplayName(".git Pattern")]
+		[Description("What pattern to use when a solution is loaded in a valid .git repository")]
+		[DefaultValue("$git{$git-branch - }$solution?ide-mode{ $}?git{ - $git-sha}")]
+		public string GitPattern{ get; set; } = "";
+
 #if false
 		[Category("Source Control")]
 		[DisplayName("Git binaries directory")]
