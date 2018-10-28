@@ -18,26 +18,38 @@ namespace Atma.TitleBarNone.Resolvers
 			ShutdownInitiated
 		}
 
-		public IDEResolver(DTE2 dte, Action<CallbackReason, IDEState> callback)
+		public static Resolver Create(DTE dte, Action<CallbackReason, IDEState> callback)
+		{
+			return new IDEResolver(dte, callback);
+		}
+
+		public IDEResolver(DTE dte, Action<CallbackReason, IDEState> callback)
 			: base(new[] { "ide-name", "ide-mode" })
 		{
 			m_DTE = dte;
-			m_DebuggerEvents = m_DTE.Events.DebuggerEvents;
-
 			m_VsMode = m_DTE.Debugger.CurrentMode;
 			m_Callback = callback;
 
-			m_DTE.Events.DTEEvents.OnStartupComplete += () => OnExecutionChanged(true);
-			m_DTE.Events.DTEEvents.OnBeginShutdown += () => OnExecutionChanged(false);
+			m_DTEEvents = m_DTE.Events.DTEEvents;
+			m_DTEEvents.OnStartupComplete += () => OnExecutionChanged(true);
+			m_DTEEvents.OnBeginShutdown += () => OnExecutionChanged(false);
 
+			m_DebuggerEvents = m_DTE.Events.DebuggerEvents;
 			m_DebuggerEvents.OnEnterDesignMode += (dbgEventReason e) => OnModeChanged(dbgDebugMode.dbgDesignMode);
 			m_DebuggerEvents.OnEnterRunMode += (dbgEventReason e) => OnModeChanged(dbgDebugMode.dbgRunMode);
 			m_DebuggerEvents.OnEnterBreakMode += (dbgEventReason e, ref dbgExecutionAction action) => OnModeChanged(dbgDebugMode.dbgBreakMode);
 		}
 
-		public static Resolver Create(DTE2 dte, Action<CallbackReason, IDEState> callback)
+		// IDEResolver is the final backup for the defaults
+		public override int SatisfiesDependency(Settings.SettingsTriplet triplet)
 		{
-			return new IDEResolver(dte, callback);
+			int result = 0;
+			if (triplet.SolutionFilter == "")
+				result |= 0x1;
+			if (triplet.Dependency == Settings.PatternDependency.None)
+				result |= 0x2;
+
+			return result;
 		}
 
 		public override bool ResolveBoolean(VsState state, string tag)
@@ -75,16 +87,18 @@ namespace Atma.TitleBarNone.Resolvers
 		private string GetModeTitle(VsState state)
 		{
 			if (state.Mode == dbgDebugMode.dbgDesignMode)
-				return "";
+				return string.Empty;
 			else if (state.Mode == dbgDebugMode.dbgRunMode)
 				return "(Running)";
 			else
 				return "(Debugging)";
 		}
 
-		private DTE2 m_DTE;
-		private EnvDTE.DebuggerEvents m_DebuggerEvents;
+		private DTE m_DTE;
 		private dbgDebugMode m_VsMode;
 		private Action<CallbackReason, IDEState> m_Callback;
+
+		private DTEEvents m_DTEEvents;
+		private DebuggerEvents m_DebuggerEvents;
 	}
 }

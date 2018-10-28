@@ -18,6 +18,8 @@ using Task = System.Threading.Tasks.Task;
 using SettingsPageGrid = Atma.TitleBarNone.Settings.SettingsPageGrid;
 using System.Collections.Generic;
 using Atma.TitleBarNone.Resolvers;
+using System.Windows;
+using System.IO;
 
 namespace Atma.TitleBarNone
 {
@@ -43,15 +45,16 @@ namespace Atma.TitleBarNone
 		public const string SolutionNameTag = "solution-name";
 		public const string SolutionPatternTag = "solution-pattern";
 
-		public const string DefaultPatternIfNothingOpen = "hooray:|$ide-name|";
-		public const string DefaultPatternIfDocumentOpen = "hooray:|$document-name - $ide-name|";
-		public const string DefaultPatternIfSolutionOpen = "hooray:|$solution-name?ide-mode{ $} - $ide-name|";
-
 		public TitleBarNonePackage()
 		{
 		}
 
-		public DTE2 DTE { get; private set; }
+		public DTE DTE
+		{
+			get;
+			private set;
+		}
+
 		public string Pattern
 		{
 			get
@@ -65,116 +68,77 @@ namespace Atma.TitleBarNone
 			}
 		}
 
-		private IEnumerable<SettingsFrame> SettingsFrames
+		private IEnumerable<Resolver> Resolvers => m_Resolvers.AsEnumerable().Reverse();
+
+		private IEnumerable<Settings.SettingsTriplet> SettingsTriplets
 		{
 			get
 			{
-				var list = new List<SettingsFrame> { m_SettingsFromSolutionDir, m_SettingsFromUserDir };
-				list.AddRange(m_SettingsFrameVsPreds);
-				list.Add(m_SettingsFromVs);
-				return list;
+				return m_UserDirFileChangeProvider.Triplets
+					.Concat(m_SolutionsFileChangeProvider.Triplets)
+					.Concat(m_DefaultsChangeProvider.Triplets)
+					;
 			}
 		}
 
-		private string PatternIfNothingOpened => SettingsFrames.Where(x => x.FormatIfNothingOpened != null).FirstOrDefault()?.FormatIfNothingOpened?.Pattern ?? "";
-		private string PatternIfDocumentOpened => SettingsFrames.Where(x => x.FormatIfDocumentOpened != null).FirstOrDefault()?.FormatIfDocumentOpened?.Pattern ?? "";
-		private string PatternIfSolutionOpened => SettingsFrames.Where(x => x.FormatIfSolutionOpened != null).FirstOrDefault()?.FormatIfSolutionOpened?.Pattern ?? "";
+		private string PatternIfNothingOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => !string.IsNullOrEmpty(x.FormatIfNothingOpened?.Pattern))
+			.FirstOrDefault()?.FormatIfNothingOpened.Pattern ?? "";
+
+		private string PatternIfDocumentOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => !string.IsNullOrEmpty(x.FormatIfDocumentOpened?.Pattern))
+			.FirstOrDefault()?.FormatIfDocumentOpened.Pattern ?? "";
+
+		private string PatternIfSolutionOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => !string.IsNullOrEmpty(x.FormatIfSolutionOpened?.Pattern))
+			.FirstOrDefault()?.FormatIfSolutionOpened.Pattern ?? "";
+
+		private bool TripletDependenciesAreSatisfied(Settings.SettingsTriplet triplet)
+		{
+			var result = Resolvers.Aggregate(0, (acc, x) => {
+				return acc | x.SatisfiesDependency(triplet);
+			});
+
+			return result == 0x3;
+		}
 
 		internal SettingsPageGrid UISettings { get; private set; }
 
-		private bool GitIsRequired => SettingsFrames.Any(x => x.FormatIfSolutionOpened.Pattern.Contains("$git"));
+		private bool GitIsRequired => SettingsTriplets.Any(x => x.FormatIfSolutionOpened.Pattern.Contains("$git"));
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
 			// initialize the DTE and bind events
-			DTE = await GetServiceAsync(typeof(DTE)) as DTE2;
+			DTE = await GetServiceAsync(typeof(DTE)) as DTE;
 
-			var sr = SolutionResolver.Create(DTE, OnSolutionChanged);
+			// create "special" resolvers
+			m_IDEResolver = IDEResolver.Create(DTE, OnIDEChanged) as IDEResolver;
+			m_SolutionResolver = SolutionResolver.Create(DTE, OnSolutionChanged) as SolutionResolver;
 
-			m_Resolvers = new List<Resolver>
-			{
-				IDEResolver.Create(DTE, OnIDEChanged),
-				sr
-			};
+			m_Resolvers = new List<Resolver> { m_IDEResolver, m_SolutionResolver };
 
-
-			// get UI settings hooks
-			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
-			UISettings.SettingsChanged += VsSettingsChanged;
-			VsSettingsChanged(UISettings, EventArgs.Empty);
-
-
-			m_WindowEvents = DTE.Events.WindowEvents;
-			m_SolutionEvents = DTE.Events.SolutionEvents;
-			m_SolutionEvents.Opened += OnSolutionOpened;
-			m_SolutionEvents.AfterClosing += SolutionUpdated;
+			// create settings readers for user-dir
+			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
+			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
 
 			// switch to UI thread
 			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
+			// get UI settings hooks
+			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
+			m_VsOptionsChangeProvider = new Settings.VsOptionsChangeProvider(UISettings);
+			m_VsOptionsChangeProvider.Changed += UpdateTitleAsync;
 		}
 
-		private void VsSettingsChanged(object sender, EventArgs e)
+		private void UpdateTitleAsync()
 		{
-			var settings = sender as SettingsPageGrid;
-
-			bool requiresUpdate =
-				(m_SettingsFromVs.FormatIfNothingOpened != settings.PatternIfNothingOpen) ||
-				(m_SettingsFromVs.FormatIfDocumentOpened != settings.PatternIfDocumentOpen) ||
-				(m_SettingsFromVs.FormatIfSolutionOpened != settings.PatternIfSolutionOpen);
-
-			m_SettingsFromVs.FormatIfNothingOpened = settings.PatternIfNothingOpen;
-			m_SettingsFromVs.FormatIfDocumentOpened = settings.PatternIfDocumentOpen;
-			m_SettingsFromVs.FormatIfSolutionOpened = settings.PatternIfSolutionOpen;
-
-			if (requiresUpdate)
+			Application.Current.Dispatcher.Invoke(() =>
+			{
 				UpdateTitle();
-		}
-
-		private void DTEEvents_OnStartupComplete()
-		{
-			if (DTE.Solution.IsOpen)
-				m_EditingMode = VsEditingMode.Solution;
-			else if (DTE.Documents.Count > 0)
-				m_EditingMode = VsEditingMode.Document;
-			else
-				m_EditingMode = VsEditingMode.Nothing;
-
-			ChangeWindowTitle("lulz");
-		}
-
-		private void DTEEvents_ModeChanged(vsIDEMode LastMode)
-		{
-			UpdateTitle();
-		}
-
-		private void OnSolutionOpened()
-		{
-			// create a filesystem informant
-			var directory = System.IO.Path.GetDirectoryName(DTE.Solution.FileName);
-			var filename = ".titlebar";
-			var config_file = System.IO.Path.Combine(directory, filename);
-
-			if (System.IO.File.Exists(config_file))
-			{
-				m_SettingsFromSolutionDir.Reset(new Settings.FileSystemChangeProvider(config_file));
-			}
-
-			// loop through custom settings
-		}
-
-		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
-		{
-			// figure out if we're in a git repository
-			if (reason == SolutionResolver.CallbackReason.SolutionOpened)
-			{
-				if (GitResolver.Required(out string gitpath, System.IO.Path.GetDirectoryName(DTE.Solution.FileName)))
-				{
-					m_Resolvers.Add(new GitResolver(gitpath));
-				}
-			}
-
-			UpdateTitle();
+			});
 		}
 
 		private void OnIDEChanged(IDEResolver.CallbackReason reason, IDEResolver.IDEState state)
@@ -185,17 +149,36 @@ namespace Atma.TitleBarNone
 			UpdateTitle();
 		}
 
-
-
-
-		private void SolutionUpdated()
+		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
 		{
+			if (reason == SolutionResolver.CallbackReason.SolutionOpened)
+			{
+				// reset the solution-file settings file
+				if (m_SolutionsFileChangeProvider != null)
+					m_SolutionsFileChangeProvider.Dispose();
+
+				m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(DTE.Solution.FileName);
+
+				// loop through custom settings
+				if (GitResolver.Required(out string gitpath, System.IO.Path.GetDirectoryName(DTE.Solution.FileName)))
+				{
+					m_Resolvers.Add(new GitResolver(gitpath));
+				}
+
+				if (VsrResolver.Required(out string vsrpath, Path.GetDirectoryName(DTE.Solution.FileName)))
+				{
+					m_Resolvers.Add(new VsrResolver(vsrpath));
+				}
+			}
+
 			UpdateTitle();
 		}
 
 		private void UpdateTitle()
 		{
 			string pattern = Pattern;
+			if (string.IsNullOrEmpty(pattern))
+				return;
 
 			var state = new VsState()
 			{
@@ -334,8 +317,14 @@ namespace Atma.TitleBarNone
 
 		private void ChangeWindowTitle(string title)
 		{
-			if (DTE.MainWindow == null)
+			if (DTE == null || DTE.MainWindow == null)
 				return;
+
+			if (System.Windows.Application.Current.MainWindow == null)
+			{
+				Debug.Print("ChangeWindowTitle - exiting early because System.Windows.Application.Current.MainWindow == null");
+				return;
+			}
 
 			try
 			{
@@ -353,48 +342,17 @@ namespace Atma.TitleBarNone
 		}
 
 		// apparently these could get garbage collected otherwise
-		private SolutionEvents m_SolutionEvents;
-		private WindowEvents m_WindowEvents;
 		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
 		private dbgDebugMode m_Mode = dbgDebugMode.dbgDesignMode;
 
-		class SettingsFrame : IDisposable
-		{
-			public Settings.TitleBarFormat FormatIfNothingOpened = null;
-			public Settings.TitleBarFormat FormatIfDocumentOpened = null;
-			public Settings.TitleBarFormat FormatIfSolutionOpened = null;
+		private List<Resolver> m_Resolvers;
 
-			public void Reset(Settings.ChangeProvider changeProvider)
-			{
-				if (m_ChangeProvider != null)
-					m_ChangeProvider.Changed -= OnSettingsChanged;
+		private Settings.SolutionFileChangeProvider m_SolutionsFileChangeProvider;
+		private Settings.UserDirFileChangeProvider m_UserDirFileChangeProvider;
+		private Settings.VsOptionsChangeProvider m_VsOptionsChangeProvider;
+		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
 
-				m_ChangeProvider = changeProvider;
-
-				if (m_ChangeProvider != null)
-					m_ChangeProvider.Changed += OnSettingsChanged;
-			}
-
-			private void OnSettingsChanged(Settings.TitleBarFormatTriplet triplet)
-			{
-				FormatIfNothingOpened = triplet.FormatIfNothingOpened;
-				FormatIfDocumentOpened = triplet.FormatIfDocumentOpened;
-				FormatIfSolutionOpened = triplet.FormatIfSolutionOpened;
-			}
-
-			public void Dispose()
-			{
-				m_ChangeProvider.Dispose();
-			}
-
-			private Settings.ChangeProvider m_ChangeProvider;
-		}
-
-		private SettingsFrame m_SettingsFromVs = new SettingsFrame();
-		private List<SettingsFrame> m_SettingsFrameVsPreds = new List<SettingsFrame>();
-		private SettingsFrame m_SettingsFromUserDir = new SettingsFrame();
-		private SettingsFrame m_SettingsFromSolutionDir = new SettingsFrame();
-		private List<SettingsFrame> m_SettingsStack = new List<SettingsFrame>();
-		private List<Resolvers.Resolver> m_Resolvers;
+		private IDEResolver m_IDEResolver;
+		private SolutionResolver m_SolutionResolver;
 	}
 }

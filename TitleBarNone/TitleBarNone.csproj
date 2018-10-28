@@ -64,11 +64,18 @@
     <Compile Include="Resolvers\IDEResolver.cs" />
     <Compile Include="Resolvers\Resolver.cs" />
     <Compile Include="Resolvers\SolutionResolver.cs" />
+    <Compile Include="Resolvers\VsrResolver.cs" />
     <Compile Include="Settings\ChangeProvider.cs" />
+    <Compile Include="Settings\Defaults.cs" />
+    <Compile Include="Settings\DefaultsChangeProvider.cs" />
+    <Compile Include="Settings\FileChangeProvider.cs" />
     <Compile Include="Settings\Settings.cs" />
     <Compile Include="Settings\SettingsPageGrid.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="Settings\SolutionFileChangeProvider.cs" />
+    <Compile Include="Settings\UserDirFileChangeProvider.cs" />
+    <Compile Include="Settings\VsOptionsChangeProvider.cs" />
     <Compile Include="TitleBarNonePackage.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -172,6 +179,9 @@
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml" />
     <Reference Include="WindowsBase" />
+    <Reference Include="Xceed.Wpf.Toolkit, Version=3.7.18313.20590, Culture=neutral, PublicKeyToken=ba83ff368b7563c6, processorArchitecture=MSIL">
+      <HintPath>..\packages\Xceed.Wpf.Toolkit.3.7.18313.20590\lib\net40\Xceed.Wpf.Toolkit.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="VSPackage.resx">

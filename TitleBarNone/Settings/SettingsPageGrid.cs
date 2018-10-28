@@ -2,53 +2,54 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.Shell;
+using System.Linq;
 
 //http://stackoverflow.com/questions/24291249/dialogpage-string-array-not-persisted
 //http://www.codeproject.com/Articles/351172/CodeStash-a-journey-into-the-dark-side-of-Visual-S
 
 namespace Atma.TitleBarNone.Settings
 {
-	[ClassInterface(ClassInterfaceType.AutoDual)]
 	public class SettingsPageGrid : DialogPage
 	{
-		[Category("Patterns")]
-		[DisplayName("No document or solution open")]
-		[Description("Default: [ideName]. See 'Supported Tags' section on the left for more guidance.")]
-		[DefaultValue(TitleBarNonePackage.DefaultPatternIfNothingOpen)]
+		[Category("Default Patterns")]
+		[DisplayName("Nothing Opened")]
+		[DefaultValue(Defaults.PatternIfNothingOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
-		public TitleBarFormat PatternIfNothingOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfNothingOpen);
+		[TypeConverter(typeof(TitleBarFormatConverter))]
+		public TitleBarFormat PatternIfNothingOpen { get; set; } = new TitleBarFormat(Defaults.PatternIfNothingOpen);
 
-		[Category("Patterns")]
-		[DisplayName("Document (no solution) open")]
-		[Description("Default: TODO")]
-		[DefaultValue(TitleBarNonePackage.DefaultPatternIfDocumentOpen)]
+		[Category("Default Patterns")]
+		[DisplayName("Document Open")]
+		[DefaultValue(Defaults.PatternIfDocumentOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
 		[Editors.PreviewRequires(Editors.PreviewRequiresAttribute.Requirement.Document)]
-		public TitleBarFormat PatternIfDocumentOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfDocumentOpen);
+		[TypeConverter(typeof(TitleBarFormatConverter))]
+		public TitleBarFormat PatternIfDocumentOpen { get; set; } = new TitleBarFormat(Defaults.PatternIfDocumentOpen);
 
-		[Category("Patterns")]
-		[DisplayName("Solution in design mode")]
-		[Description("Default: [parentPath]\\[solutionName] - [ideName]. See 'Supported tags' section on the left for more guidance.")]
-		[DefaultValue(TitleBarNonePackage.DefaultPatternIfSolutionOpen)]
+		[Category("Default Patterns")]
+		[DisplayName("Solution Opened")]
+		[DefaultValue(Defaults.PatternIfSolutionOpen)]
 		[Editor(typeof(Editors.PatternEditor), typeof(System.Drawing.Design.UITypeEditor))]
 		[Editors.PreviewRequires(Editors.PreviewRequiresAttribute.Requirement.Solution)]
-		public TitleBarFormat PatternIfSolutionOpen { get; set; } = new TitleBarFormat(TitleBarNonePackage.DefaultPatternIfSolutionOpen);
+		[TypeConverter(typeof(TitleBarFormatConverter))]
+		public TitleBarFormat PatternIfSolutionOpen { get; set; } = new TitleBarFormat(Defaults.PatternIfSolutionOpen);
 
-		[Category("Source Control Patterns")]
-		[DisplayName(".git Pattern")]
-		[Description("What pattern to use when a solution is loaded in a valid .git repository")]
-		[DefaultValue("$git{$git-branch - }$solution?ide-mode{ $}?git{ - $git-sha}")]
-		public string GitPattern{ get; set; } = "";
+		[Category("Source Control")]
+		[DisplayName("Git - Item Open")]
+		[Description("What pattern to use when a document or solution is loaded in a valid .git repository")]
+		[DefaultValue(Defaults.GitPatternIfOpen)]
+		[TypeConverter(typeof(TitleBarFormatConverter))]
+		public TitleBarFormat GitPatternIfOpen { get; set; } = new TitleBarFormat(Defaults.GitPatternIfOpen);
 
 #if false
 		[Category("Source Control")]
-		[DisplayName("Git binaries directory")]
-		[Description("Default: Empty. Search windows PATH for git if empty.")]
-		[Editor(typeof(Editors.FilePickerEditor), typeof(System.Drawing.Design.UITypeEditor))]
-		[Editors.FilePicker(true, Informers.GitInformer.ExecutableFilename, "Git executable (git.exe)|git.exe|All files (*.*)|*.*", 1)]
-		[DefaultValue("")]
-		public string GitDirectory { get; set; } = "";
+		[DisplayName("SVN - Item Open")]
+		[Description("What pattern to use when a document or solution is loaded in a valid .git repository")]
+		[DefaultValue(Defaults.GitPatternIfOpen]
+		[TypeConverter(typeof(TitleBarFormatConverter))]
+		public TitleBarFormat SvnPatternIfOpen { get; set; } = new TitleBarFormat(Defaults.GitPatternIfOpen);
 #endif
+
 #if false
 		[Category("Source Control")]
 		[DisplayName("Hg binaries directory")]

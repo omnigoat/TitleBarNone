@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Drawing.Design;
 using System.Windows.Forms.Design;
 using System.Windows.Forms;
+using System.Drawing;
 
 namespace Atma.TitleBarNone.Editors
 {
@@ -36,6 +37,18 @@ namespace Atma.TitleBarNone.Editors
 			return UITypeEditorEditStyle.DropDown;
 		}
 
+		public override void PaintValue(PaintValueEventArgs e)
+		{
+			using (Pen p = Pens.Black)
+			{
+				e.Graphics.DrawRectangle(p, e.Bounds.Left, e.Bounds.Top, Math.Min(e.Bounds.Width, 40), e.Bounds.Height);
+
+				// draw regular stuff in the leftover space
+				base.PaintValue(new PaintValueEventArgs(e.Context, e.Value, e.Graphics,
+					new Rectangle(e.Bounds.Left + Math.Min(e.Bounds.Width, 40), e.Bounds.Top, e.Bounds.Width, e.Bounds.Height)));
+			}
+		}
+
 		public override object EditValue(ITypeDescriptorContext context, IServiceProvider provider, object value)
 		{
 			Controls.PatternControl ctl = new Controls.PatternControl();
@@ -54,7 +67,7 @@ namespace Atma.TitleBarNone.Editors
 				}
 			}
 
-			return ep;
+			return "lmao no";
 		}
 
 		private TitleBarNonePackage package;

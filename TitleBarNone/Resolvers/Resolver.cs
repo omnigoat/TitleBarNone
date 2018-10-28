@@ -1,6 +1,7 @@
 ﻿using EnvDTE;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Atma.TitleBarNone.Resolvers
 {
@@ -18,15 +19,20 @@ namespace Atma.TitleBarNone.Resolvers
 		}
 
 		delegate void ChangedDelegate(Resolver resolver);
-		readonly ChangedDelegate Changed;
+		ChangedDelegate Changed;
 
 		public bool Applicable(string tag) { return m_Tags.Contains(tag); }
 		public abstract bool ResolveBoolean(VsState state, string tag);
 		public abstract string Resolve(VsState state, string tag);
 
+		public virtual int SatisfiesDependency(Settings.SettingsTriplet triplet)
+		{
+			return 0;
+		}
+
 		protected void RaiseChange()
 		{
-			Changed.Invoke(this);
+			Changed?.Invoke(this);
 		}
 
 		private readonly List<string> m_Tags;

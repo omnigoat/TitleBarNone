@@ -1,8 +1,10 @@
-﻿using EnvDTE80;
+﻿using Atma.TitleBarNone.Settings;
+using EnvDTE;
 using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Atma.TitleBarNone.Resolvers
 {
@@ -14,13 +16,13 @@ namespace Atma.TitleBarNone.Resolvers
 			SolutionClosed
 		}
 
-		internal static Resolver Create(DTE2 dte, Action<CallbackReason> callback = null)
+		internal static Resolver Create(DTE dte, Action<CallbackReason> callback = null)
 		{
 			return new SolutionResolver(dte, callback);
 		}
 
-		public SolutionResolver(DTE2 dte, Action<CallbackReason> callback)
-			: base(new [] { "solution", "solution-name", "solution-dir" })
+		public SolutionResolver(DTE dte, Action<CallbackReason> callback)
+			: base(new [] { "solution", "solution-name", "solution-dir", "item-name" })
 		{
 			m_DTE = dte;
 			m_Callback = callback;
@@ -43,12 +45,17 @@ namespace Atma.TitleBarNone.Resolvers
 
 		public override string Resolve(VsState state, string tag)
 		{
-			if (tag == "solution-name" && state.Solution?.FullName != null)
+			if ((tag == "solution-name" || tag == "item-name") && state.Solution?.FullName != null)
 				return Path.GetFileNameWithoutExtension(state.Solution.FullName);
 			else if (tag == "solution-dir")
 				return Path.GetFileName(Path.GetDirectoryName(state.Solution.FileName)) + "\\";
 			else
 				throw new InvalidOperationException();
+		}
+
+		public override int SatisfiesDependency(SettingsTriplet triplet)
+		{
+			return Regex.Match(m_DTE.Solution.FullName, triplet.SolutionFilter).Success ? 1 : 0;
 		}
 
 		private void OnSolutionOpened()
@@ -64,7 +71,7 @@ namespace Atma.TitleBarNone.Resolvers
 		}
 
 		
-		private DTE2 m_DTE;
+		private DTE m_DTE;
 		private EnvDTE.SolutionEvents m_SolutionEvents;
 		private Action<CallbackReason> m_Callback;
 	}
