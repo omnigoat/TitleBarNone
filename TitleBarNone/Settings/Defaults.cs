@@ -8,6 +8,8 @@ namespace Atma.TitleBarNone.Settings
 {
 	static class Defaults
 	{
+		public const string ConfgFileName = ".title-bar-none";
+
 		public const string PatternIfNothingOpen = "PatternIfNothingOpen|$ide-name|";
 		public const string PatternIfDocumentOpen = "PatternIfDocumentOpen|$document-name - $ide-name|";
 		public const string PatternIfSolutionOpen = "PatternIfSolutionOpen|$solution-name?ide-mode{ $} - $ide-name|";

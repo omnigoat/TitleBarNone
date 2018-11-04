@@ -40,6 +40,8 @@ namespace Atma.TitleBarNone.Resolvers
 			m_DebuggerEvents.OnEnterBreakMode += (dbgEventReason e, ref dbgExecutionAction action) => OnModeChanged(dbgDebugMode.dbgBreakMode);
 		}
 
+		public override ChangedDelegate Changed { get; set; }
+
 		// IDEResolver is the final backup for the defaults
 		public override int SatisfiesDependency(Settings.SettingsTriplet triplet)
 		{

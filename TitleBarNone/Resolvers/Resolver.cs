@@ -8,7 +8,7 @@ namespace Atma.TitleBarNone.Resolvers
 	public struct VsState
 	{
 		public dbgDebugMode Mode;
-		public EnvDTE.Solution Solution;
+		public Solution Solution;
 	}
 
 	public abstract class Resolver
@@ -18,8 +18,8 @@ namespace Atma.TitleBarNone.Resolvers
 			m_Tags = tags.ToList();
 		}
 
-		delegate void ChangedDelegate(Resolver resolver);
-		ChangedDelegate Changed;
+		public delegate void ChangedDelegate(Resolver resolver);
+		public abstract ChangedDelegate Changed { get; set; }
 
 		public bool Applicable(string tag) { return m_Tags.Contains(tag); }
 		public abstract bool ResolveBoolean(VsState state, string tag);

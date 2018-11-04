@@ -16,27 +16,18 @@ namespace Atma.TitleBarNone.Resolvers
 			SolutionClosed
 		}
 
-		internal static Resolver Create(DTE dte, Action<CallbackReason> callback = null)
+		internal static SolutionResolver Create(Models.SolutionModel solutionModel)
 		{
-			return new SolutionResolver(dte, callback);
+			return new SolutionResolver(solutionModel);
 		}
 
-		public SolutionResolver(DTE dte, Action<CallbackReason> callback)
+		public SolutionResolver(Models.SolutionModel solutionModel)
 			: base(new [] { "solution", "solution-name", "solution-dir", "item-name" })
 		{
-			m_DTE = dte;
-			m_Callback = callback;
-
-			m_SolutionEvents = m_DTE.Events.SolutionEvents;
-			m_SolutionEvents.Opened += OnSolutionOpened;
-			m_SolutionEvents.AfterClosing += OnSolutionClosed;
+			solutionModel.SolutionOpened += OnSolutionOpened;
 		}
 
-		public delegate void SolutionOpenedDelegate(string filepath);
-		public delegate void SolutionClosedDelegate();
-
-		public event SolutionOpenedDelegate SolutionOpened;
-		public event SolutionClosedDelegate SolutionClosed;
+		public override ChangedDelegate Changed { get; set; }
 
 		public override bool ResolveBoolean(VsState state, string tag)
 		{
@@ -55,24 +46,19 @@ namespace Atma.TitleBarNone.Resolvers
 
 		public override int SatisfiesDependency(SettingsTriplet triplet)
 		{
-			return Regex.Match(m_DTE.Solution.FullName, triplet.SolutionFilter).Success ? 1 : 0;
+			return Regex.Match(solution.FullName, triplet.SolutionFilter).Success ? 1 : 0;
 		}
 
-		private void OnSolutionOpened()
+		private void OnSolutionOpened(Solution solution)
 		{
-			SolutionOpened?.Invoke(m_DTE.Solution.FileName);
-			m_Callback?.Invoke(CallbackReason.SolutionOpened);
+			this.solution = solution;
 		}
 
 		private void OnSolutionClosed()
 		{
-			SolutionClosed?.Invoke();
-			m_Callback?.Invoke(CallbackReason.SolutionClosed);
+			this.solution = null;
 		}
 
-		
-		private DTE m_DTE;
-		private EnvDTE.SolutionEvents m_SolutionEvents;
-		private Action<CallbackReason> m_Callback;
+		private Solution solution;
 	}
 }

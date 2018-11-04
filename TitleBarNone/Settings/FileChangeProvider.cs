@@ -12,17 +12,15 @@ namespace Atma.TitleBarNone.Settings
 		public FileChangeProvider(string filepath)
 		{
 			FilePath = filepath;
-
-			if (!File.Exists(FilePath))
+			if (!File.Exists(FilePath) || Path.GetFileName(FilePath) != Defaults.ConfgFileName)
 				return;
 
 			// file system watcher
-			var directory = Path.GetDirectoryName(FilePath);
-			m_Watcher = new FileSystemWatcher(directory);
+			WatchingDirectory = Path.GetDirectoryName(FilePath);
+			m_Watcher = new FileSystemWatcher(WatchingDirectory, Defaults.ConfgFileName);
 			m_Watcher.Changed += Watcher_Changed;
 
-			if (filepath.EndsWith(".title-bar-none-config"))
-				Watcher_Changed(null, new FileSystemEventArgs(WatcherChangeTypes.Created, directory, filepath));
+			Watcher_Changed(null, new FileSystemEventArgs(WatcherChangeTypes.Created, WatchingDirectory, filepath));
 
 			m_Watcher.EnableRaisingEvents = true;
 		}
@@ -32,7 +30,7 @@ namespace Atma.TitleBarNone.Settings
 
 		public string FilePath;
 
-		private void Watcher_Changed(object sender, FileSystemEventArgs e)
+		protected virtual void Watcher_Changed(object sender, FileSystemEventArgs e)
 		{
 			var triplets = ParseFile(FilePath);
 
@@ -46,12 +44,16 @@ namespace Atma.TitleBarNone.Settings
 		// IDisposable implementation
 		protected override void DisposeImpl()
 		{
-			m_Watcher.Dispose();
+			m_Watcher?.Dispose();
 		}
 
 		List<SettingsTriplet> ParseFile(string filepath)
 		{
 			var triplets = new List<SettingsTriplet>();
+
+			var file = new FileInfo(filepath);
+			if (!file.Exists || file.Name != Defaults.ConfgFileName)
+				return triplets;
 
 			List<string> lines = new List<string>();
 			for (int i = 0; i != 3; ++i)
@@ -170,6 +172,7 @@ namespace Atma.TitleBarNone.Settings
 			return match.Success;
 		}
 
+		private string WatchingDirectory;
 		private FileSystemWatcher m_Watcher;
 		private readonly Regex m_NothingTitleRegex = new Regex("nothing-title: (.+)$");
 		private readonly Regex m_DocumentTitleRegex = new Regex("document-title: (.+)$");

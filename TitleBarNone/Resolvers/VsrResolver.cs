@@ -20,16 +20,22 @@ namespace Atma.TitleBarNone.Resolvers
 			return outpath != null;
 		}
 
-		public VsrResolver(string gitpath)
+		public VsrResolver(string path)
 			: base(new[] { "vsr", "vsr-branch", "vsr-sha" })
 		{
-			m_VsrPath = gitpath;
+			m_VsrPath = path;
 
-			m_Watcher = new FileSystemWatcher(gitpath);
+			m_Watcher = new FileSystemWatcher(path)
+			{
+				IncludeSubdirectories = true
+			};
 			m_Watcher.Changed += VsrFolderChanged;
+			m_Watcher.EnableRaisingEvents = true;
 
 			ReadInfo();
 		}
+
+		public override ChangedDelegate Changed { get; set; }
 
 		public override int SatisfiesDependency(SettingsTriplet triplet)
 		{
@@ -51,7 +57,8 @@ namespace Atma.TitleBarNone.Resolvers
 					Arguments = "info",
 					UseShellExecute = false,
 					CreateNoWindow = true,
-					RedirectStandardOutput = true
+					RedirectStandardOutput = true,
+					WorkingDirectory = new DirectoryInfo(m_VsrPath).Parent.FullName.ToString()
 				}
 			};
 
@@ -68,19 +75,31 @@ namespace Atma.TitleBarNone.Resolvers
 				return;
 			
 			var lines = e.Data.Split('\n');
-				
+			bool changed = false;
+
 			// parse branch
 			{
 				var match = Regex.Match(lines[0], "on branch \"([a-zA-Z0-9_-]+)\"");
-				if (match.Success)
+				if (match.Success && m_VsrBranch != match.Groups[1].Value)
+				{
 					m_VsrBranch = match.Groups[1].Value;
+					changed = true;
+				}
 			}
 
-			// prase SHA
+			// parse SHA
 			{
 				var match = Regex.Match(lines[0], "Version ([a-fA-F0-9-]+)");
 				if (match.Success)
+				{
 					m_VsrSHA = match.Groups[1].Value;
+					changed = true;
+				}
+			}
+
+			if (changed)
+			{
+				Changed?.Invoke(this);
 			}
 		}
 

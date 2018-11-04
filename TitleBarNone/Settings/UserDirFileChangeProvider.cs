@@ -12,7 +12,7 @@ namespace Atma.TitleBarNone.Settings
 
 		private static string GetUserDirFile()
 		{
-			return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".title-bar-none-config");
+			return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Defaults.ConfgFileName);
 		}
 	}
 }

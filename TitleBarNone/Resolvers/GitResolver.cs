@@ -30,6 +30,8 @@ namespace Atma.TitleBarNone.Resolvers
 			ReadBranch();
 		}
 
+		public override ChangedDelegate Changed { get; set; }
+
 		public override int SatisfiesDependency(SettingsTriplet triplet)
 		{
 			return triplet.Dependency == PatternDependency.Git ? 2 : 0;
@@ -63,9 +65,10 @@ namespace Atma.TitleBarNone.Resolvers
 
 		private void GitBranchReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
 		{
-			if (e.Data != null)
+			if (e.Data != null && m_GitBranch != e.Data)
 			{
 				m_GitBranch = e.Data;
+				Changed?.Invoke(this);
 			}
 		}
 
@@ -100,6 +103,6 @@ namespace Atma.TitleBarNone.Resolvers
 
 		private readonly string m_GitPath;
 		private FileSystemWatcher m_Watcher;
-		private string m_GitBranch;
+		private string m_GitBranch = "";
 	}
 }

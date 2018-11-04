@@ -114,9 +114,12 @@ namespace Atma.TitleBarNone
 			// initialize the DTE and bind events
 			DTE = await GetServiceAsync(typeof(DTE)) as DTE;
 
+			// create models of IDE/Solution
+			solutionModel = new Models.SolutionModel(DTE);
+
 			// create "special" resolvers
 			m_IDEResolver = IDEResolver.Create(DTE, OnIDEChanged) as IDEResolver;
-			m_SolutionResolver = SolutionResolver.Create(DTE, OnSolutionChanged) as SolutionResolver;
+			m_SolutionResolver = SolutionResolver.Create(solutionModel);
 
 			m_Resolvers = new List<Resolver> { m_IDEResolver, m_SolutionResolver };
 
@@ -160,7 +163,7 @@ namespace Atma.TitleBarNone
 				m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(DTE.Solution.FileName);
 
 				// loop through custom settings
-				if (GitResolver.Required(out string gitpath, System.IO.Path.GetDirectoryName(DTE.Solution.FileName)))
+				if (GitResolver.Required(out string gitpath, Path.GetDirectoryName(DTE.Solution.FileName)))
 				{
 					m_Resolvers.Add(new GitResolver(gitpath));
 				}
@@ -169,6 +172,15 @@ namespace Atma.TitleBarNone
 				{
 					m_Resolvers.Add(new VsrResolver(vsrpath));
 				}
+
+				foreach (var resolver in m_Resolvers)
+				{
+					resolver.Changed += (Resolver r) => UpdateTitleAsync();
+				}
+			}
+			else if (reason == SolutionResolver.CallbackReason.SolutionClosed)
+			{
+				m_Resolvers.Clear();
 			}
 
 			UpdateTitle();
@@ -198,7 +210,7 @@ namespace Atma.TitleBarNone
 			transformed = "";
 
 			// begin pattern parsing
-			while (i != pattern.Length)
+			while (i < pattern.Length)
 			{
 				// escape sequences
 				if (pattern[i] == '\\')
@@ -340,6 +352,9 @@ namespace Atma.TitleBarNone
 				Debug.Print(e.Message);
 			}
 		}
+
+		// models
+		private Models.SolutionModel solutionModel;
 
 		// apparently these could get garbage collected otherwise
 		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
