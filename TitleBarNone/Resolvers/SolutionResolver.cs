@@ -22,7 +22,7 @@ namespace Atma.TitleBarNone.Resolvers
 		}
 
 		public SolutionResolver(Models.SolutionModel solutionModel)
-			: base(new [] { "solution", "solution-name", "solution-dir", "item-name" })
+			: base(new [] { "solution", "solution-name", "solution-dir", "item-name", "path" })
 		{
 			OnSolutionOpened(solutionModel.StartupSolution);
 
@@ -40,7 +40,28 @@ namespace Atma.TitleBarNone.Resolvers
 
 		public override string Resolve(VsState state, string tag)
 		{
-			if ((tag == "solution-name" || tag == "item-name") && state.Solution?.FullName != null)
+			if (tag.StartsWith("path"))
+			{
+				var m = Regex.Match(tag, "path\\(([0-9]+), ([0-9]+)\\)");
+				if (m.Success)
+				{
+					var arg1 = int.Parse(m.Groups[1].Value);
+					var arg2 = int.Parse(m.Groups[2].Value);
+
+					var result = new FileInfo(solution.FileName).Directory.FullName.Split(Path.DirectorySeparatorChar)
+						.Reverse()
+						.Skip(arg1)
+						.Take(arg2)
+						.Reverse()
+						.Aggregate((a, b) => a + Path.DirectorySeparatorChar + b);
+
+					return result;
+				}
+
+				// oh fuck we need to parse path
+				return "";
+			}
+			else if ((tag == "solution-name" || tag == "item-name") && state.Solution?.FullName != null)
 				return Path.GetFileNameWithoutExtension(state.Solution.FullName);
 			else if (tag == "solution-dir")
 				return Path.GetFileName(Path.GetDirectoryName(state.Solution.FileName)) + "\\";

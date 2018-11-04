@@ -23,7 +23,11 @@ namespace Atma.TitleBarNone.Resolvers
 		public delegate void ChangedDelegate(Resolver resolver);
 		public abstract ChangedDelegate Changed { get; set; }
 
-		public bool Applicable(string tag) { return m_Tags.Contains(tag); }
+		public bool Applicable(string tag)
+		{
+			return m_Tags.Contains(new string(tag.TakeWhile(x => char.IsLetter(x) || x == '-').ToArray()));
+		}
+
 		public abstract bool ResolveBoolean(VsState state, string tag);
 		public abstract string Resolve(VsState state, string tag);
 
