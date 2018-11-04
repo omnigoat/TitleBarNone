@@ -298,25 +298,91 @@ namespace Atma.TitleBarNone
 			return true;
 		}
 
+		// we support two common methods of string escaping: parens and identifier
+		//
+		// any pattern that contains a $ will either be immeidately followed with an identifier,
+		// or a braced expression, e.g., $git-branch, or ${git-branch}
+		//
+		// the identifier may be a function-call, like "$path(0, 2)"
+		//
 		private bool ParseDollar(out string result, VsState state, string pattern, ref int i, string singleDollar)
 		{
-			var tag = new string(pattern
-				.Substring(i + 1)
-				.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
-				.ToArray());
+			++i;
 
-			i += 1 + tag.Length;
-
-			if (tag.Length == 0 && singleDollar != null)
+			// peek for brace vs non-brace
+			//
+			// find EOF or whitespace or number
+			if (i == pattern.Length || char.IsWhiteSpace(pattern[i]) || char.IsNumber(pattern[i]))
 			{
-				result = singleDollar;
+				++i;
+				result = singleDollar ?? "";
 				return true;
 			}
+			// find brace
+			else if (pattern[i] == '{')
+			{
+				var braceExpr = new string(pattern
+					.Substring(i + 1)
+					.TakeWhile(x => x != '}')
+					.ToArray());
 
-			result = m_Resolvers
-				.FirstOrDefault(x => x.Applicable(tag))
-				?.Resolve(state, tag)
-				?? tag;
+				i += 1 + braceExpr.Length;
+				if (i != pattern.Length && pattern[i] == '}')
+					++i;
+
+				// maybe:
+				//  - split by whitespace
+				//  - attempt to resolve all
+				//  - join together
+				result = braceExpr.Split(' ')
+					.Select(x =>
+					{
+						return m_Resolvers
+						.FirstOrDefault(r => r.Applicable(x))
+						?.Resolve(state, x) ?? x;
+					})
+					.Aggregate((a, b) => a + " " + b);
+					
+			}
+			// find identifier
+			else if (pattern[i] >= 'a' && pattern[i] <= 'z')
+			{
+				var idenExpr = new string(pattern
+					.Substring(i)
+					.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
+					.ToArray());
+
+				i += idenExpr.Length;
+
+				if (i != pattern.Length)
+				{
+					if (pattern[i] == '(')
+					{
+						var argExpr = new string(pattern
+							.Substring(i)
+							.TakeWhile(x => x != ')')
+							.ToArray());
+
+						i += argExpr.Length;
+						if (i != pattern.Length && pattern[i] == ')')
+						{
+							++i;
+							argExpr += ')';
+						}
+
+						idenExpr += argExpr;
+					}
+				}
+
+				result = m_Resolvers
+					.FirstOrDefault(x => x.Applicable(idenExpr))
+					?.Resolve(state, idenExpr)
+					?? idenExpr;
+			}
+			else
+			{
+				result = "";
+			}
 
 			return true;
 		}
