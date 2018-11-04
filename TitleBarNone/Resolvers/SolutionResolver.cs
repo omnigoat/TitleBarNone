@@ -24,8 +24,12 @@ namespace Atma.TitleBarNone.Resolvers
 		public SolutionResolver(Models.SolutionModel solutionModel)
 			: base(new [] { "solution", "solution-name", "solution-dir", "item-name" })
 		{
+			OnSolutionOpened(solutionModel.StartupSolution);
+
 			solutionModel.SolutionOpened += OnSolutionOpened;
 		}
+
+		public override bool Available => solution != null;
 
 		public override ChangedDelegate Changed { get; set; }
 

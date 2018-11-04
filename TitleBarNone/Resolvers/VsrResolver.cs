@@ -1,4 +1,5 @@
 ﻿using Atma.TitleBarNone.Settings;
+using EnvDTE;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,31 +12,73 @@ namespace Atma.TitleBarNone.Resolvers
 {
 	class VsrResolver : Resolver
 	{
-		public static bool Required(out string outpath, string path)
+		public static VsrResolver Create(Models.SolutionModel solutionModel)
 		{
-			outpath = GetAllParentDirectories(new DirectoryInfo(path))
+			return new VsrResolver(solutionModel);
+		}
+
+		public VsrResolver(Models.SolutionModel solutionModel)
+			: base(new[] { "vsr", "vsr-branch", "vsr-sha" })
+		{
+			OnSolutionOpened(solutionModel.StartupSolution);
+
+			solutionModel.SolutionOpened += OnSolutionOpened;
+			solutionModel.SolutionClosed += OnSolutionClosed;
+		}
+
+		public override bool Available => vsrPath != null;
+
+		public override ChangedDelegate Changed { get; set; }
+
+		public override bool ResolveBoolean(VsState state, string tag)
+		{
+			return tag == "vsr";
+		}
+
+		public override string Resolve(VsState state, string tag)
+		{
+			if (tag == "vsr-branch")
+				return m_VsrBranch;
+			else if (tag == "vsr-sha")
+				return m_VsrSHA;
+			else
+				return "";
+		}
+
+		private void OnSolutionOpened(Solution solution)
+		{
+			if (string.IsNullOrEmpty(solution?.FileName))
+				return;
+
+			var solutionDir = new FileInfo(solution.FileName).Directory;
+
+			vsrPath = GetAllParentDirectories(solutionDir)
 				.SelectMany(x => x.GetDirectories())
 				.FirstOrDefault(x => x.Name == ".versionr")?.FullName;
 
-			return outpath != null;
-		}
-
-		public VsrResolver(string path)
-			: base(new[] { "vsr", "vsr-branch", "vsr-sha" })
-		{
-			m_VsrPath = path;
-
-			m_Watcher = new FileSystemWatcher(path)
+			if (vsrPath != null)
 			{
-				IncludeSubdirectories = true
-			};
-			m_Watcher.Changed += VsrFolderChanged;
-			m_Watcher.EnableRaisingEvents = true;
+				m_Watcher = new FileSystemWatcher(vsrPath)
+				{
+					IncludeSubdirectories = true
+				};
 
-			ReadInfo();
+				m_Watcher.Changed += VsrFolderChanged;
+				m_Watcher.EnableRaisingEvents = true;
+
+				ReadInfo();
+			}
 		}
 
-		public override ChangedDelegate Changed { get; set; }
+		private void OnSolutionClosed()
+		{
+			vsrPath = null;
+			if (m_Watcher != null)
+			{
+				m_Watcher.EnableRaisingEvents = false;
+				m_Watcher.Dispose();
+			}
+		}
 
 		public override int SatisfiesDependency(SettingsTriplet triplet)
 		{
@@ -58,7 +101,7 @@ namespace Atma.TitleBarNone.Resolvers
 					UseShellExecute = false,
 					CreateNoWindow = true,
 					RedirectStandardOutput = true,
-					WorkingDirectory = new DirectoryInfo(m_VsrPath).Parent.FullName.ToString()
+					WorkingDirectory = new DirectoryInfo(vsrPath).Parent.FullName.ToString()
 				}
 			};
 
@@ -103,21 +146,6 @@ namespace Atma.TitleBarNone.Resolvers
 			}
 		}
 
-		public override string Resolve(VsState state, string tag)
-		{
-			if (tag == "vsr-branch")
-				return m_VsrBranch;
-			else if (tag == "vsr-sha")
-				return m_VsrSHA;
-			else
-				return "";
-		}
-
-		public override bool ResolveBoolean(VsState state, string tag)
-		{
-			return tag == "vsr";
-		}
-
 		private static IEnumerable<DirectoryInfo> GetAllParentDirectories(DirectoryInfo directoryToScan)
 		{
 			Stack<DirectoryInfo> ret = new Stack<DirectoryInfo>();
@@ -134,7 +162,7 @@ namespace Atma.TitleBarNone.Resolvers
 			GetAllParentDirectories(directoryToScan.Parent, ref directories);
 		}
 
-		private readonly string m_VsrPath;
+		private string vsrPath;
 		private FileSystemWatcher m_Watcher;
 		private string m_VsrBranch;
 		private string m_VsrSHA;

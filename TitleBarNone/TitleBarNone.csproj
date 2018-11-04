@@ -59,6 +59,8 @@
     </Compile>
     <Compile Include="Editors\FilePickerEditor.cs" />
     <Compile Include="Editors\PatternEditor.cs" />
+    <Compile Include="Models\IDEModel.cs" />
+    <Compile Include="Models\SolutionModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resolvers\GitResolver.cs" />
     <Compile Include="Resolvers\IDEResolver.cs" />

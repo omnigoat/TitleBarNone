@@ -6,39 +6,19 @@ namespace Atma.TitleBarNone.Resolvers
 {
 	public class IDEResolver : Resolver
 	{
-		public struct IDEState
+		public static IDEResolver Create(Models.IDEModel ideModel)
 		{
-			public dbgDebugMode Mode;
+			return new IDEResolver(ideModel);
 		}
 
-		public enum CallbackReason
-		{
-			StartupComplete,
-			ModeChanged,
-			ShutdownInitiated
-		}
-
-		public static Resolver Create(DTE dte, Action<CallbackReason, IDEState> callback)
-		{
-			return new IDEResolver(dte, callback);
-		}
-
-		public IDEResolver(DTE dte, Action<CallbackReason, IDEState> callback)
+		public IDEResolver(Models.IDEModel ideModel)
 			: base(new[] { "ide-name", "ide-mode" })
 		{
-			m_DTE = dte;
-			m_VsMode = m_DTE.Debugger.CurrentMode;
-			m_Callback = callback;
-
-			m_DTEEvents = m_DTE.Events.DTEEvents;
-			m_DTEEvents.OnStartupComplete += () => OnExecutionChanged(true);
-			m_DTEEvents.OnBeginShutdown += () => OnExecutionChanged(false);
-
-			m_DebuggerEvents = m_DTE.Events.DebuggerEvents;
-			m_DebuggerEvents.OnEnterDesignMode += (dbgEventReason e) => OnModeChanged(dbgDebugMode.dbgDesignMode);
-			m_DebuggerEvents.OnEnterRunMode += (dbgEventReason e) => OnModeChanged(dbgDebugMode.dbgRunMode);
-			m_DebuggerEvents.OnEnterBreakMode += (dbgEventReason e, ref dbgExecutionAction action) => OnModeChanged(dbgDebugMode.dbgBreakMode);
+			ideModel.IdeModeChanged += OnModeChanged;
+			vsMode = ideModel.VsMode;
 		}
+
+		public override bool Available => true;
 
 		public override ChangedDelegate Changed { get; set; }
 
@@ -72,18 +52,13 @@ namespace Atma.TitleBarNone.Resolvers
 				return null;
 		}
 
-		private void OnExecutionChanged(bool going)
-		{
-			if (going)
-				m_Callback(CallbackReason.StartupComplete, new IDEState { Mode = m_VsMode });
-			else
-				m_Callback(CallbackReason.ShutdownInitiated, new IDEState { Mode = m_VsMode });
-		}
-
 		private void OnModeChanged(dbgDebugMode mode)
 		{
-			m_VsMode = mode;
-			m_Callback(CallbackReason.ModeChanged, new IDEState { Mode = m_VsMode });
+			if (mode != vsMode)
+			{
+				vsMode = mode;
+				Changed?.Invoke(this);
+			}
 		}
 
 		private string GetModeTitle(VsState state)
@@ -96,11 +71,6 @@ namespace Atma.TitleBarNone.Resolvers
 				return "(Debugging)";
 		}
 
-		private DTE m_DTE;
-		private dbgDebugMode m_VsMode;
-		private Action<CallbackReason, IDEState> m_Callback;
-
-		private DTEEvents m_DTEEvents;
-		private DebuggerEvents m_DebuggerEvents;
+		private dbgDebugMode vsMode;
 	}
 }

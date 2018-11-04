@@ -10,6 +10,11 @@ namespace Atma.TitleBarNone.Resolvers
 {
 	public class GitResolver : Resolver
 	{
+		public static GitResolver Create(Models.SolutionModel solutionModel)
+		{
+			return new GitResolver(solutionModel);
+		}
+
 		public static bool Required(out string outpath, string path)
 		{
 			outpath = GetAllParentDirectories(new DirectoryInfo(path))
@@ -19,16 +24,16 @@ namespace Atma.TitleBarNone.Resolvers
 			return outpath != null;
 		}
 
-		public GitResolver(string gitpath)
+		public GitResolver(Models.SolutionModel solutionModel)
 			: base(new[] { "git", "git-branch", "git-sha" })
 		{
-			m_GitPath = gitpath;
+			OnSolutionOpened(solutionModel.StartupSolution);
 
-			m_Watcher = new FileSystemWatcher(gitpath);
-			m_Watcher.Changed += GitFolderChanged;
-
-			ReadBranch();
+			solutionModel.SolutionOpened += OnSolutionOpened;
+			solutionModel.SolutionClosed += OnSolutionClosed;
 		}
+
+		public override bool Available => gitPath != null;
 
 		public override ChangedDelegate Changed { get; set; }
 
@@ -37,12 +42,58 @@ namespace Atma.TitleBarNone.Resolvers
 			return triplet.Dependency == PatternDependency.Git ? 2 : 0;
 		}
 
-		private void GitFolderChanged(object sender, FileSystemEventArgs e)
+		public override bool ResolveBoolean(VsState state, string tag)
 		{
-			ReadBranch();
+			return tag == "git";
 		}
 
-		private void ReadBranch()
+		public override string Resolve(VsState state, string tag)
+		{
+			if (tag == "git-branch")
+				return gitBranch;
+			else if (tag == "git-sha")
+				return gitSha;
+			else
+				return "";
+		}
+
+		private void OnSolutionOpened(Solution solution)
+		{
+			if (string.IsNullOrEmpty(solution?.FileName))
+				return;
+
+			var solutionDir = new FileInfo(solution.FileName).Directory;
+
+			gitPath = GetAllParentDirectories(solutionDir)
+					.SelectMany(x => x.GetDirectories())
+					.FirstOrDefault(x => x.Name == ".git")?.FullName;
+
+			if (gitPath != null)
+			{
+				fileWatcher = new FileSystemWatcher(gitPath);
+				fileWatcher.Changed += GitFolderChanged;
+				fileWatcher.EnableRaisingEvents = true;
+
+				ReadInfo();
+			}
+		}
+
+		private void OnSolutionClosed()
+		{
+			gitPath = null;
+			if (fileWatcher != null)
+			{
+				fileWatcher.EnableRaisingEvents = false;
+				fileWatcher.Dispose();
+			}
+		}
+
+		private void GitFolderChanged(object sender, FileSystemEventArgs e)
+		{
+			ReadInfo();
+		}
+
+		private void ReadInfo()
 		{
 			var p = new System.Diagnostics.Process()
 			{
@@ -52,37 +103,52 @@ namespace Atma.TitleBarNone.Resolvers
 					Arguments = "symbolic-ref -q --short HEAD",
 					UseShellExecute = false,
 					CreateNoWindow = true,
-					RedirectStandardOutput = true
+					RedirectStandardOutput = true,
+					WorkingDirectory = gitPath
 				}
 			};
 
 			p.OutputDataReceived += GitBranchReceived;
 			p.Start();
 			p.BeginOutputReadLine();
-			p.WaitForExit();
-		}
 
+			var p2 = new System.Diagnostics.Process()
+			{
+				StartInfo = new System.Diagnostics.ProcessStartInfo()
+				{
+					FileName = "git.exe",
+					Arguments = "rev-parse --short HEAD",
+					UseShellExecute = false,
+					CreateNoWindow = true,
+					RedirectStandardOutput = true,
+					WorkingDirectory = gitPath
+				}
+			};
+
+			p2.OutputDataReceived += GitShaReceived;
+			p2.Start();
+			p2.BeginOutputReadLine();
+
+			p.WaitForExit();
+			p2.WaitForExit();
+		}
 
 		private void GitBranchReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
 		{
-			if (e.Data != null && m_GitBranch != e.Data)
+			if (e.Data != null && gitBranch != e.Data)
 			{
-				m_GitBranch = e.Data;
+				gitBranch = e.Data;
 				Changed?.Invoke(this);
 			}
 		}
 
-		public override string Resolve(VsState state, string tag)
+		private void GitShaReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
 		{
-			if (tag == "git-branch")
-				return m_GitBranch;
-			else
-				return "";
-		}
-
-		public override bool ResolveBoolean(VsState state, string tag)
-		{
-			return tag == "git";
+			if (e.Data != null && gitSha != e.Data)
+			{
+				gitSha = e.Data;
+				Changed?.Invoke(this);
+			}
 		}
 
 		private static IEnumerable<DirectoryInfo> GetAllParentDirectories(DirectoryInfo directoryToScan)
@@ -101,8 +167,9 @@ namespace Atma.TitleBarNone.Resolvers
 			GetAllParentDirectories(directoryToScan.Parent, ref directories);
 		}
 
-		private readonly string m_GitPath;
-		private FileSystemWatcher m_Watcher;
-		private string m_GitBranch = "";
+		private string gitPath = string.Empty;
+		private FileSystemWatcher fileWatcher;
+		private string gitBranch = "";
+		private string gitSha = "";
 	}
 }

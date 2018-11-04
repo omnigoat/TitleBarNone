@@ -98,9 +98,11 @@ namespace Atma.TitleBarNone
 
 		private bool TripletDependenciesAreSatisfied(Settings.SettingsTriplet triplet)
 		{
-			var result = Resolvers.Aggregate(0, (acc, x) => {
-				return acc | x.SatisfiesDependency(triplet);
-			});
+			var result = Resolvers
+				.Where(x => x.Available)
+				.Aggregate(0, (acc, x) => {
+					return acc | x.SatisfiesDependency(triplet);
+				});
 
 			return result == 0x3;
 		}
@@ -115,13 +117,25 @@ namespace Atma.TitleBarNone
 			DTE = await GetServiceAsync(typeof(DTE)) as DTE;
 
 			// create models of IDE/Solution
+			ideModel = new Models.IDEModel(DTE);
 			solutionModel = new Models.SolutionModel(DTE);
 
-			// create "special" resolvers
-			m_IDEResolver = IDEResolver.Create(DTE, OnIDEChanged) as IDEResolver;
-			m_SolutionResolver = SolutionResolver.Create(solutionModel);
+			solutionModel.SolutionOpened += OnSolutionOpened;
+			solutionModel.SolutionClosed += OnSolutionClosed;
 
-			m_Resolvers = new List<Resolver> { m_IDEResolver, m_SolutionResolver };
+			// create resolvers
+			m_Resolvers = new List<Resolver>
+			{
+				IDEResolver.Create(ideModel),
+				SolutionResolver.Create(solutionModel),
+				GitResolver.Create(solutionModel),
+				VsrResolver.Create(solutionModel)
+			};
+
+			foreach (var resolver in m_Resolvers)
+			{
+				resolver.Changed += (Resolver r) => UpdateTitleAsync();
+			}
 
 			// create settings readers for user-dir
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
@@ -136,54 +150,33 @@ namespace Atma.TitleBarNone
 			m_VsOptionsChangeProvider.Changed += UpdateTitleAsync;
 		}
 
+		private void OnSolutionOpened(Solution solution)
+		{
+			// reset the solution-file settings file
+			m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(solution.FileName);
+
+			//if (VsrResolver.Required(out string vsrpath, Path.GetDirectoryName(DTE.Solution.FileName)))
+			//{
+			//	m_Resolvers.Add(new VsrResolver(vsrpath));
+			//}
+
+			UpdateTitleAsync();
+		}
+
+		private void OnSolutionClosed()
+		{
+			if (m_SolutionsFileChangeProvider != null)
+				m_SolutionsFileChangeProvider.Dispose();
+
+			UpdateTitleAsync();
+		}
+
 		private void UpdateTitleAsync()
 		{
-			Application.Current.Dispatcher.Invoke(() =>
+			Application.Current?.Dispatcher?.InvokeAsync(() =>
 			{
 				UpdateTitle();
 			});
-		}
-
-		private void OnIDEChanged(IDEResolver.CallbackReason reason, IDEResolver.IDEState state)
-		{
-			if (reason == IDEResolver.CallbackReason.ModeChanged)
-				m_Mode = state.Mode;
-
-			UpdateTitle();
-		}
-
-		private void OnSolutionChanged(SolutionResolver.CallbackReason reason)
-		{
-			if (reason == SolutionResolver.CallbackReason.SolutionOpened)
-			{
-				// reset the solution-file settings file
-				if (m_SolutionsFileChangeProvider != null)
-					m_SolutionsFileChangeProvider.Dispose();
-
-				m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(DTE.Solution.FileName);
-
-				// loop through custom settings
-				if (GitResolver.Required(out string gitpath, Path.GetDirectoryName(DTE.Solution.FileName)))
-				{
-					m_Resolvers.Add(new GitResolver(gitpath));
-				}
-
-				if (VsrResolver.Required(out string vsrpath, Path.GetDirectoryName(DTE.Solution.FileName)))
-				{
-					m_Resolvers.Add(new VsrResolver(vsrpath));
-				}
-
-				foreach (var resolver in m_Resolvers)
-				{
-					resolver.Changed += (Resolver r) => UpdateTitleAsync();
-				}
-			}
-			else if (reason == SolutionResolver.CallbackReason.SolutionClosed)
-			{
-				m_Resolvers.Clear();
-			}
-
-			UpdateTitle();
 		}
 
 		private void UpdateTitle()
@@ -322,9 +315,10 @@ namespace Atma.TitleBarNone
 
 			result = m_Resolvers
 				.FirstOrDefault(x => x.Applicable(tag))
-				?.Resolve(state, tag);
+				?.Resolve(state, tag)
+				?? tag;
 
-			return result != null;
+			return true;
 		}
 
 		private void ChangeWindowTitle(string title)
@@ -355,9 +349,9 @@ namespace Atma.TitleBarNone
 
 		// models
 		private Models.SolutionModel solutionModel;
+		private Models.IDEModel ideModel;
 
 		// apparently these could get garbage collected otherwise
-		private VsEditingMode m_EditingMode = VsEditingMode.Nothing;
 		private dbgDebugMode m_Mode = dbgDebugMode.dbgDesignMode;
 
 		private List<Resolver> m_Resolvers;
@@ -366,8 +360,5 @@ namespace Atma.TitleBarNone
 		private Settings.UserDirFileChangeProvider m_UserDirFileChangeProvider;
 		private Settings.VsOptionsChangeProvider m_VsOptionsChangeProvider;
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
-
-		private IDEResolver m_IDEResolver;
-		private SolutionResolver m_SolutionResolver;
 	}
 }

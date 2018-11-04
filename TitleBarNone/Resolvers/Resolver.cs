@@ -18,6 +18,8 @@ namespace Atma.TitleBarNone.Resolvers
 			m_Tags = tags.ToList();
 		}
 
+		public abstract bool Available { get; }
+
 		public delegate void ChangedDelegate(Resolver resolver);
 		public abstract ChangedDelegate Changed { get; set; }
 
