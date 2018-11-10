@@ -9,6 +9,8 @@ namespace Atma.TitleBarNone.Models
 	{
 		public TitleBarModel(Window window)
 		{
+			this.Window = window;
+
 			try
 			{
 				// set title bar of main window
@@ -58,6 +60,7 @@ namespace Atma.TitleBarNone.Models
 			}
 		}
 
+		public Window Window { get; internal set; }
 
 		public void SetTitleBarColor(System.Drawing.Color? color)
 		{

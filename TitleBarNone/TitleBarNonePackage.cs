@@ -33,6 +33,53 @@ namespace Atma.TitleBarNone
 		Solution
 	}
 
+	static class ExtensionMethods
+	{
+		public static IEnumerable<IComparable<T>> SoDistinct<T>(this IOrderedEnumerable<T> lhs, IOrderedEnumerable<T> rhs) where T : class, IComparable<T>
+		{
+			var lhsi = lhs.GetEnumerator();
+			var rhsi = rhs.GetEnumerator();
+			bool lr = lhsi.MoveNext();
+			bool rr = rhsi.MoveNext();
+
+			var result = new List<IComparable<T>>();
+			
+			while (lr && rr)
+			{
+				var b = lhsi.Current.CompareTo(rhsi.Current as T);
+				if (b < 0)
+				{
+					result.Add(lhsi.Current);
+					lr = lhsi.MoveNext();
+				}
+				else if (0 < b)
+				{
+					result.Add(rhsi.Current);
+					rr = rhsi.MoveNext();
+				}
+				else
+				{
+					lr = lhsi.MoveNext();
+					rr = rhsi.MoveNext();
+				}
+			}
+
+			while (lr)
+			{
+				result.Add(lhsi.Current);
+				lr = lhsi.MoveNext();
+			}
+
+			while (rr)
+			{
+				result.Add(rhsi.Current);
+				rr = rhsi.MoveNext();
+			}
+
+			return result;
+		}
+	}
+
 	[PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
 	[InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
 	[Guid(PackageGuidString)]
@@ -483,15 +530,52 @@ namespace Atma.TitleBarNone
 		// able to reset to that when needed. if we create a new TitleBarModel
 		// every time, it'll just think the defaults are the already-coloured
 		// title bars.
+		private class ComparableWindow : IComparable<ComparableWindow>
+		{
+			public ComparableWindow(System.Windows.Window window)
+			{
+				this.Window = window;
+			}
+
+			public int CompareTo(ComparableWindow other)
+			{
+				return Window.GetHashCode().CompareTo(other.Window.GetHashCode());
+			}
+
+			public System.Windows.Window Window { get; internal set; }
+		}
+
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
 			Application.Current.Dispatcher.InvokeAsync(() =>
 			{
-				var models = Application.Current.Windows
+				var seenWindows = Application.Current.Windows
 					.Cast<System.Windows.Window>()
-					.Select(x => new Models.TitleBarModel(x));
+					.ToList();
 
-				foreach (var model in models)
+				// remove old models
+				var removableWindows = knownWindows
+					.Except(seenWindows)
+					.ToList();
+
+				foreach (var m in windowModels.Where(x => removableWindows.Where(y => y == x.Window).Count() > 0))
+				{
+					m.SetTitleBarColor(null);
+				}
+
+				windowModels.RemoveAll(x => removableWindows.Where(y => y == x.Window).Count() > 0);
+
+				// add new models & update them
+				var newWindows = seenWindows.Except(knownWindows).ToList();
+
+				var newModels = newWindows
+					.Select(x => new Models.TitleBarModel(x))
+					.ToList();
+
+				windowModels.AddRange(newModels);
+				knownWindows.AddRange(newWindows);
+				
+				foreach (var model in windowModels)
 				{
 					model.SetTitleBarColor(color);
 				}
@@ -547,5 +631,8 @@ namespace Atma.TitleBarNone
 
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
 		private System.Drawing.Color? lastSetColor;
+
+		private List<System.Windows.Window> knownWindows = new List<System.Windows.Window>();
+		private List<Models.TitleBarModel> windowModels = new List<Models.TitleBarModel>();
 	}
 }
