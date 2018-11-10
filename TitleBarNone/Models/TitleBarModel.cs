@@ -45,7 +45,7 @@ namespace Atma.TitleBarNone.Models
 				if (this.titleBarContainer != null)
 				{
 					System.Reflection.PropertyInfo propertyInfo = this.titleBarContainer.GetType().GetProperty(ColorPropertyName);
-					this.defaultBackgroundValue = propertyInfo.GetValue(this.titleBarContainer);
+					this.defaultBackgroundValue = propertyInfo.GetValue(this.titleBarContainer) as Brush;
 				}
 
 				if (this.titleBarTextBox != null)
@@ -59,23 +59,21 @@ namespace Atma.TitleBarNone.Models
 		}
 
 
-		public void SetTitleBarColor(System.Drawing.Color color)
+		public void SetTitleBarColor(System.Drawing.Color? color)
 		{
 			try
 			{
+				CalculateColors(color, out Brush backgroundColor, out Brush textColor);
+				
 				if (titleBarContainer != null)
 				{
 					System.Reflection.PropertyInfo propertyInfo = titleBarContainer.GetType().GetProperty(ColorPropertyName);
-					propertyInfo.SetValue(titleBarContainer, new SolidColorBrush(System.Windows.Media.Color.FromArgb(color.A, color.R, color.G, color.B)), null);
+					propertyInfo.SetValue(titleBarContainer, backgroundColor, null);
 				}
 
 				if (titleBarTextBox != null)
 				{
-					float luminance = 0.299f * color.R + 0.587f * color.G + 0.114f * color.B;
-					if (luminance > 128.0f)
-						titleBarTextBox.Foreground = new SolidColorBrush(Color.FromRgb(0, 0, 0));
-					else
-						titleBarTextBox.Foreground = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+					titleBarTextBox.Foreground = textColor;
 				}
 			}
 			catch
@@ -84,12 +82,33 @@ namespace Atma.TitleBarNone.Models
 			}
 		}
 
+		public void CalculateColors(System.Drawing.Color? color, out Brush backgroundColor, out Brush textColor)
+		{
+			if (!color.HasValue)
+			{
+				backgroundColor = defaultBackgroundValue;
+				textColor = defaultTextForeground;
+			}
+			else
+			{
+				var c = color.Value;
+
+				backgroundColor = new SolidColorBrush(Color.FromArgb(c.A, c.R, c.G, c.B));
+
+				float luminance = 0.299f * c.R + 0.587f * c.G + 0.114f * c.B;
+				if (luminance > 128.0f)
+					textColor = new SolidColorBrush(Color.FromRgb(0, 0, 0));
+				else
+					textColor = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+			}
+		}
 
 		private DependencyObject titleBarContainer = null;
 		private TextBlock titleBarTextBox = null;
 
-		private object defaultBackgroundValue = null;
+		private readonly Brush defaultBackgroundValue;
+		private readonly Brush defaultTextForeground;
+
 		private const string ColorPropertyName = "Background";
-		private System.Windows.Media.Brush defaultTextForeground = null;
 	}
 }

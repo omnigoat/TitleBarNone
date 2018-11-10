@@ -26,8 +26,8 @@ namespace Atma.TitleBarNone.Settings
 			Color = color;
 		}
 
-		public string Pattern = null;
-		public System.Drawing.Color Color = System.Drawing.Color.Transparent;
+		public string Pattern;
+		public System.Drawing.Color? Color;
 	}
 
 	public class TitleBarFormatConverter : TypeConverter

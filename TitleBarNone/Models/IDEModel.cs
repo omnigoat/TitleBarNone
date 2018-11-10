@@ -1,4 +1,5 @@
 ﻿using EnvDTE;
+using EnvDTE80;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +24,14 @@ namespace Atma.TitleBarNone.Models
 			debuggerEvents.OnEnterBreakMode += (dbgEventReason e, ref dbgExecutionAction action) => OnModeChanged(dbgDebugMode.dbgBreakMode);
 
 			VsMode = this.dte.Debugger.CurrentMode;
+
+			// callbacks for IDE windows being opened
+			var events2 = dte.Events as Events2;
+			if (events2 != null)
+			{
+				windowVisibilityEvents = events2.WindowVisibilityEvents;
+				windowVisibilityEvents.WindowShowing += (Window w) => WindowShown?.Invoke(w);
+			}
 		}
 
 		public dbgDebugMode VsMode { get; set; }
@@ -30,10 +39,12 @@ namespace Atma.TitleBarNone.Models
 		public delegate void StartupCompleteDelegate();
 		public delegate void ShutdownInitiatedDelegate();
 		public delegate void IdeModeChangedDelegate(dbgDebugMode mode);
+		public delegate void WindowShownDelegate(Window window);
 
 		public event StartupCompleteDelegate StartupComplete;
 		public event ShutdownInitiatedDelegate ShutdownInitiated;
 		public event IdeModeChangedDelegate IdeModeChanged;
+		public event WindowShownDelegate WindowShown;
 
 		private void OnModeChanged(dbgDebugMode mode)
 		{
@@ -44,5 +55,6 @@ namespace Atma.TitleBarNone.Models
 		private DTE dte;
 		private DTEEvents dteEvents;
 		private DebuggerEvents debuggerEvents;
+		private WindowVisibilityEvents windowVisibilityEvents;
 	}
 }

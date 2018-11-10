@@ -208,8 +208,9 @@ namespace Atma.TitleBarNone
 
 			// create models of IDE/Solution
 			ideModel = new Models.IDEModel(DTE);
-			solutionModel = new Models.SolutionModel(DTE);
+			ideModel.WindowShown += OnWindowShowing;
 
+			solutionModel = new Models.SolutionModel(DTE);
 			solutionModel.SolutionOpened += OnSolutionOpened;
 			solutionModel.SolutionClosed += OnSolutionClosed;
 
@@ -231,28 +232,6 @@ namespace Atma.TitleBarNone
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
 			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
 
-			//CreateWindowPollingThread();
-
-			RDTTheThings();
-
-			var blam = DTE.Events.WindowEvents;
-			blam.WindowCreated += Blam_WindowCreated;
-			blam.WindowActivated += Blam_WindowActivated;
-
-#if false // automation has undesirable effects :(
-			// automation framework
-			// Instead we're using a bigger gun: The Automation framework!
-			// Sadly, it is not enough to listen to child windows of VS since code window popups are direct children of the desktop in terms of UI.
-			Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent, AutomationElement.RootElement, TreeScope.Children, OnWindowOpenedOrClosed);
-			// Weirdly, this doesn't apply to ALL child windows, and some are children of the main window after all. (Repro: Create a window out of two non-code views)
-			//var windowHandle = new WindowInteropHelper(Application.Current.MainWindow).Handle;
-			//var windowAutomationElement = AutomationElement.FromHandle(windowHandle);
-			//Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent, windowAutomationElement, TreeScope.Subtree, OnWindowOpenedOrClosed);
-
-			// Cant use TreeScope.Children on WindowClosedEvent.
-			//Automation.AddAutomationEventHandler(WindowPattern.WindowClosedEvent, AutomationElement.RootElement, TreeScope.Subtree, OnWindowOpenedOrClosed);
-#endif
-
 			// switch to UI thread
 			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
@@ -260,90 +239,6 @@ namespace Atma.TitleBarNone
 			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
 			m_VsOptionsChangeProvider = new Settings.VsOptionsChangeProvider(UISettings);
 			m_VsOptionsChangeProvider.Changed += UpdateTitleAsync;
-		}
-
-		private void Blam_WindowActivated(EnvDTE.Window GotFocus, EnvDTE.Window LostFocus)
-		{
-			Debug.Print("INFO: Blam_WindowActivated");
-		}
-
-		private void Blam_WindowCreated(EnvDTE.Window Window)
-		{
-			Debug.Print("INFO: Blam_WindowCreated");
-		}
-
-		private void RDTTheThings()
-		{
-			var e2 = ((DTE as DTE2).Events as Events2);
-			if (e2 != null)
-			{
-				e2.WindowVisibilityEvents.WindowShowing += WindowVisibilityEvents_WindowShowing;
-			}
-
-			outputWindowEvents = DTE.Events.OutputWindowEvents;
-			outputWindowEvents.PaneAdded += OutputWindowEvents_PaneAdded;
-			var rdt = (IVsRunningDocumentTable)GetService(typeof(SVsRunningDocumentTable));
-			rdt.AdviseRunningDocTableEvents(rdtWatcher, out uint cookie);
-
-			var something = (IVsUIShell7)GetService(typeof(SVsUIShell));
-			if (something != null)
-			{
-				something.AdviseWindowFrameEvents(windowFrameResponder);
-			}
-		}
-
-		private void WindowVisibilityEvents_WindowShowing(EnvDTE.Window Window)
-		{
-			ChangeWindowTitleColor(TitleBarColor);
-		}
-
-		private void OutputWindowEvents_PaneAdded(OutputWindowPane pPane)
-		{
-			Debug.Print("INFO: OutputWindowEvents_PaneAdded");
-		}
-
-		// so this is kind of shitty - we are polling Visual Studio itself every x milliseconds
-		// to find if the windows have changed much, and if so, we're changing title-bars
-		//
-		// this is because the WindowOpen events don't do what you think/want them to do, and
-		// using System.Windows.Automation requires us to put hooks in the RootElement (a.k.a.,
-		// the desktop), which draws the Automation BoundingBox around every WPF element in
-		// ALL processes on the system. truly terrible.
-		private void CreateWindowPollingThread()
-		{
-			new System.Threading.Thread(async () =>
-			{
-				System.Threading.Thread.CurrentThread.IsBackground = true;
-
-				var windows = await Application.Current.Dispatcher.InvokeAsync(() =>
-				{
-					var r = new System.Windows.Window[Application.Current.Windows.Count];
-					Application.Current.Windows.CopyTo(r, 0);
-					return r.OrderBy(x => x.Uid).ToArray();
-				});
-
-				while (true)
-				{
-					await Application.Current.Dispatcher.InvokeAsync(() =>
-					{
-						var w2 = new System.Windows.Window[Application.Current.Windows.Count];
-						Application.Current.Windows.CopyTo(w2, 0);
-						w2 = w2.OrderBy(x => x.Uid).ToArray();
-
-						bool recolor = w2.Count() != windows.Count()
-							|| windows.Zip(w2, (a, b) => Tuple.Create(a, b))
-								.Any(x => x.Item1.Uid != x.Item2.Uid);
-
-						if (recolor)
-						{
-							ChangeWindowTitleColor(TitleBarColor);
-							windows = w2;
-						}
-					});
-
-					System.Threading.Thread.Sleep(100);
-				}
-			}).Start();
 		}
 
 		private void OnSolutionOpened(Solution solution)
@@ -354,27 +249,17 @@ namespace Atma.TitleBarNone
 			UpdateTitleAsync();
 		}
 
-#if false
-		private void OnWindowOpenedOrClosed(object sender, AutomationEventArgs args)
-		{
-			// filter out other processes' elements
-			var element = sender as AutomationElement;
-			if (element == null)
-				return;
-
-			if (element.Current.ProcessId != currentProcessId)
-				return;
-
-			ChangeWindowTitleColor(TitleBarColor.Value);
-		}
-#endif
-
 		private void OnSolutionClosed()
 		{
 			if (m_SolutionsFileChangeProvider != null)
 				m_SolutionsFileChangeProvider.Dispose();
 
 			UpdateTitleAsync();
+		}
+
+		private void OnWindowShowing(EnvDTE.Window Window)
+		{
+			ChangeWindowTitleColor(TitleBarColor);
 		}
 
 		private void UpdateTitleAsync()
@@ -593,11 +478,13 @@ namespace Atma.TitleBarNone
 			return true;
 		}
 
+		// SERIOUSLY, we need to track which windows are new and not, so that
+		// we can track their default background colour/text colour, as to be
+		// able to reset to that when needed. if we create a new TitleBarModel
+		// every time, it'll just think the defaults are the already-coloured
+		// title bars.
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
-			if (!color.HasValue)
-				return;
-
 			Application.Current.Dispatcher.InvokeAsync(() =>
 			{
 				var models = Application.Current.Windows
@@ -606,7 +493,7 @@ namespace Atma.TitleBarNone
 
 				foreach (var model in models)
 				{
-					model.SetTitleBarColor(color.Value);
+					model.SetTitleBarColor(color);
 				}
 			});
 		}
@@ -634,7 +521,7 @@ namespace Atma.TitleBarNone
 					if (lastSetColor != color)
 					{
 						ChangeWindowTitleColor(color);
-						lastSetColor = color.Value;
+						lastSetColor = color;
 					}
 				});
 			}
@@ -659,11 +546,6 @@ namespace Atma.TitleBarNone
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
 
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
-		private System.Drawing.Color lastSetColor;
-
-		private RDTWatcher rdtWatcher = new RDTWatcher();
-		private WindowFrameResponder windowFrameResponder = new WindowFrameResponder();
-
-		private OutputWindowEvents outputWindowEvents;
+		private System.Drawing.Color? lastSetColor;
 	}
 }
