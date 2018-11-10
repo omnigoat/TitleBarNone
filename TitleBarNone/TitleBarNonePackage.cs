@@ -5,8 +5,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Linq;
+using System.Windows.Automation;
 using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio;
@@ -20,6 +22,7 @@ using System.Collections.Generic;
 using Atma.TitleBarNone.Resolvers;
 using System.Windows;
 using System.IO;
+using System.Windows.Interop;
 
 namespace Atma.TitleBarNone
 {
@@ -60,11 +63,24 @@ namespace Atma.TitleBarNone
 			get
 			{
 				if (DTE.Solution.IsOpen)
-					return PatternIfSolutionOpened;
+					return FormatIfSolutionOpened?.Pattern ?? "";
 				else if (DTE.Documents.Count > 0)
-					return PatternIfDocumentOpened;
+					return FormatIfDocumentOpened?.Pattern ?? "";
 				else
-					return PatternIfNothingOpened;
+					return FormatIfNothingOpened?.Pattern ?? "";
+			}
+		}
+
+		public System.Drawing.Color? TitleBarColor
+		{
+			get
+			{
+				if (DTE.Solution.IsOpen)
+					return FormatIfSolutionOpened?.Color;
+				else if (DTE.Documents.Count > 0)
+					return FormatIfDocumentOpened?.Color;
+				else
+					return FormatIfNothingOpened?.Color;
 			}
 		}
 
@@ -75,26 +91,26 @@ namespace Atma.TitleBarNone
 			get
 			{
 				return m_UserDirFileChangeProvider.Triplets
-					.Concat(m_SolutionsFileChangeProvider.Triplets)
+					.Concat(m_SolutionsFileChangeProvider?.Triplets)
 					.Concat(m_DefaultsChangeProvider.Triplets)
 					;
 			}
 		}
 
-		private string PatternIfNothingOpened => SettingsTriplets
+		private Settings.TitleBarFormat FormatIfNothingOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfNothingOpened?.Pattern))
-			.FirstOrDefault()?.FormatIfNothingOpened.Pattern ?? "";
+			.FirstOrDefault()?.FormatIfNothingOpened;
 
-		private string PatternIfDocumentOpened => SettingsTriplets
+		private Settings.TitleBarFormat FormatIfDocumentOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfDocumentOpened?.Pattern))
-			.FirstOrDefault()?.FormatIfDocumentOpened.Pattern ?? "";
+			.FirstOrDefault()?.FormatIfDocumentOpened;
 
-		private string PatternIfSolutionOpened => SettingsTriplets
+		private Settings.TitleBarFormat FormatIfSolutionOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfSolutionOpened?.Pattern))
-			.FirstOrDefault()?.FormatIfSolutionOpened.Pattern ?? "";
+			.FirstOrDefault()?.FormatIfSolutionOpened;
 
 		private bool TripletDependenciesAreSatisfied(Settings.SettingsTriplet triplet)
 		{
@@ -110,6 +126,80 @@ namespace Atma.TitleBarNone
 		internal SettingsPageGrid UISettings { get; private set; }
 
 		private bool GitIsRequired => SettingsTriplets.Any(x => x.FormatIfSolutionOpened.Pattern.Contains("$git"));
+
+		class RDTWatcher : IVsRunningDocTableEvents
+		{
+			public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
+			{
+				Debug.Print("INFO: OnAfterFirstDocumentLock");
+				return VSConstants.S_OK;
+			}
+
+			public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
+			{
+				Debug.Print("INFO: OnBeforeLastDocumentUnlock");
+				return VSConstants.S_OK;
+			}
+
+			public int OnAfterSave(uint docCookie)
+			{
+				Debug.Print("INFO: OnAfterSave");
+				return VSConstants.S_OK;
+			}
+
+			public int OnAfterAttributeChange(uint docCookie, uint grfAttribs)
+			{
+				Debug.Print("INFO: OnAfterAttributeChange");
+				return VSConstants.S_OK;
+			}
+
+			public int OnBeforeDocumentWindowShow(uint docCookie, int fFirstShow, IVsWindowFrame pFrame)
+			{
+				Debug.Print("INFO: OnBeforeDocumentWindowShow");
+				int r = pFrame.GetProperty((int)__VSFPROPID.VSFPROPID_CreateDocWinFlags, out object flags);
+				if (r == VSConstants.S_OK && ((int)flags & (int)__VSCREATEDOCWIN.CDW_fCreateNewWindow) != 0)
+				{
+					Debug.Print("INFO: OnBeforeDocumentWindowShow - NEW WINDOW");
+				}
+
+				return VSConstants.S_OK;
+			}
+
+			public int OnAfterDocumentWindowHide(uint docCookie, IVsWindowFrame pFrame)
+			{
+				Debug.Print("INFO: OnAfterDocumentWindowHide");
+				return VSConstants.S_OK;
+			}
+		}
+
+		class WindowFrameResponder : IVsWindowFrameEvents
+		{
+			public void OnFrameCreated(IVsWindowFrame frame)
+			{
+				Debug.Print("INFO: OnFrameCreated");
+			}
+
+			public void OnFrameDestroyed(IVsWindowFrame frame)
+			{
+				Debug.Print("INFO: OnFrameDestroyed");
+			}
+
+			public void OnFrameIsVisibleChanged(IVsWindowFrame frame, bool newIsVisible)
+			{
+				Debug.Print("INFO: OnFrameIsVisibleChanged");
+			}
+
+			public void OnFrameIsOnScreenChanged(IVsWindowFrame frame, bool newIsOnScreen)
+			{
+				Debug.Print("INFO: OnFrameIsOnScreenChanged");
+			}
+
+			public void OnActiveFrameChanged(IVsWindowFrame oldFrame, IVsWindowFrame newFrame)
+			{
+				Debug.Print("INFO: OnActiveFrameChanged");
+			}
+		}
+
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
@@ -141,6 +231,28 @@ namespace Atma.TitleBarNone
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
 			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
 
+			//CreateWindowPollingThread();
+
+			RDTTheThings();
+
+			var blam = DTE.Events.WindowEvents;
+			blam.WindowCreated += Blam_WindowCreated;
+			blam.WindowActivated += Blam_WindowActivated;
+
+#if false // automation has undesirable effects :(
+			// automation framework
+			// Instead we're using a bigger gun: The Automation framework!
+			// Sadly, it is not enough to listen to child windows of VS since code window popups are direct children of the desktop in terms of UI.
+			Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent, AutomationElement.RootElement, TreeScope.Children, OnWindowOpenedOrClosed);
+			// Weirdly, this doesn't apply to ALL child windows, and some are children of the main window after all. (Repro: Create a window out of two non-code views)
+			//var windowHandle = new WindowInteropHelper(Application.Current.MainWindow).Handle;
+			//var windowAutomationElement = AutomationElement.FromHandle(windowHandle);
+			//Automation.AddAutomationEventHandler(WindowPattern.WindowOpenedEvent, windowAutomationElement, TreeScope.Subtree, OnWindowOpenedOrClosed);
+
+			// Cant use TreeScope.Children on WindowClosedEvent.
+			//Automation.AddAutomationEventHandler(WindowPattern.WindowClosedEvent, AutomationElement.RootElement, TreeScope.Subtree, OnWindowOpenedOrClosed);
+#endif
+
 			// switch to UI thread
 			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
@@ -150,18 +262,112 @@ namespace Atma.TitleBarNone
 			m_VsOptionsChangeProvider.Changed += UpdateTitleAsync;
 		}
 
+		private void Blam_WindowActivated(EnvDTE.Window GotFocus, EnvDTE.Window LostFocus)
+		{
+			Debug.Print("INFO: Blam_WindowActivated");
+		}
+
+		private void Blam_WindowCreated(EnvDTE.Window Window)
+		{
+			Debug.Print("INFO: Blam_WindowCreated");
+		}
+
+		private void RDTTheThings()
+		{
+			var e2 = ((DTE as DTE2).Events as Events2);
+			if (e2 != null)
+			{
+				e2.WindowVisibilityEvents.WindowShowing += WindowVisibilityEvents_WindowShowing;
+			}
+
+			outputWindowEvents = DTE.Events.OutputWindowEvents;
+			outputWindowEvents.PaneAdded += OutputWindowEvents_PaneAdded;
+			var rdt = (IVsRunningDocumentTable)GetService(typeof(SVsRunningDocumentTable));
+			rdt.AdviseRunningDocTableEvents(rdtWatcher, out uint cookie);
+
+			var something = (IVsUIShell7)GetService(typeof(SVsUIShell));
+			if (something != null)
+			{
+				something.AdviseWindowFrameEvents(windowFrameResponder);
+			}
+		}
+
+		private void WindowVisibilityEvents_WindowShowing(EnvDTE.Window Window)
+		{
+			ChangeWindowTitleColor(TitleBarColor);
+		}
+
+		private void OutputWindowEvents_PaneAdded(OutputWindowPane pPane)
+		{
+			Debug.Print("INFO: OutputWindowEvents_PaneAdded");
+		}
+
+		// so this is kind of shitty - we are polling Visual Studio itself every x milliseconds
+		// to find if the windows have changed much, and if so, we're changing title-bars
+		//
+		// this is because the WindowOpen events don't do what you think/want them to do, and
+		// using System.Windows.Automation requires us to put hooks in the RootElement (a.k.a.,
+		// the desktop), which draws the Automation BoundingBox around every WPF element in
+		// ALL processes on the system. truly terrible.
+		private void CreateWindowPollingThread()
+		{
+			new System.Threading.Thread(async () =>
+			{
+				System.Threading.Thread.CurrentThread.IsBackground = true;
+
+				var windows = await Application.Current.Dispatcher.InvokeAsync(() =>
+				{
+					var r = new System.Windows.Window[Application.Current.Windows.Count];
+					Application.Current.Windows.CopyTo(r, 0);
+					return r.OrderBy(x => x.Uid).ToArray();
+				});
+
+				while (true)
+				{
+					await Application.Current.Dispatcher.InvokeAsync(() =>
+					{
+						var w2 = new System.Windows.Window[Application.Current.Windows.Count];
+						Application.Current.Windows.CopyTo(w2, 0);
+						w2 = w2.OrderBy(x => x.Uid).ToArray();
+
+						bool recolor = w2.Count() != windows.Count()
+							|| windows.Zip(w2, (a, b) => Tuple.Create(a, b))
+								.Any(x => x.Item1.Uid != x.Item2.Uid);
+
+						if (recolor)
+						{
+							ChangeWindowTitleColor(TitleBarColor);
+							windows = w2;
+						}
+					});
+
+					System.Threading.Thread.Sleep(100);
+				}
+			}).Start();
+		}
+
 		private void OnSolutionOpened(Solution solution)
 		{
 			// reset the solution-file settings file
 			m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(solution.FileName);
 
-			//if (VsrResolver.Required(out string vsrpath, Path.GetDirectoryName(DTE.Solution.FileName)))
-			//{
-			//	m_Resolvers.Add(new VsrResolver(vsrpath));
-			//}
-
 			UpdateTitleAsync();
 		}
+
+#if false
+		private void OnWindowOpenedOrClosed(object sender, AutomationEventArgs args)
+		{
+			// filter out other processes' elements
+			var element = sender as AutomationElement;
+			if (element == null)
+				return;
+
+			if (element.Current.ProcessId != currentProcessId)
+				return;
+
+			ChangeWindowTitleColor(TitleBarColor.Value);
+		}
+#endif
 
 		private void OnSolutionClosed()
 		{
@@ -387,14 +593,32 @@ namespace Atma.TitleBarNone
 			return true;
 		}
 
+		private void ChangeWindowTitleColor(System.Drawing.Color? color)
+		{
+			if (!color.HasValue)
+				return;
+
+			Application.Current.Dispatcher.InvokeAsync(() =>
+			{
+				var models = Application.Current.Windows
+					.Cast<System.Windows.Window>()
+					.Select(x => new Models.TitleBarModel(x));
+
+				foreach (var model in models)
+				{
+					model.SetTitleBarColor(color.Value);
+				}
+			});
+		}
+
 		private void ChangeWindowTitle(string title)
 		{
 			if (DTE == null || DTE.MainWindow == null)
 				return;
 
-			if (System.Windows.Application.Current.MainWindow == null)
+			if (Application.Current.MainWindow == null)
 			{
-				Debug.Print("ChangeWindowTitle - exiting early because System.Windows.Application.Current.MainWindow == null");
+				Debug.Print("ChangeWindowTitle - exiting early because Application.Current.MainWindow == null");
 				return;
 			}
 
@@ -402,9 +626,16 @@ namespace Atma.TitleBarNone
 			{
 				ThreadHelper.Generic.Invoke(() =>
 				{
-					System.Windows.Application.Current.MainWindow.Title = DTE.MainWindow.Caption;
-					if (System.Windows.Application.Current.MainWindow.Title != title)
-						System.Windows.Application.Current.MainWindow.Title = title;
+					Application.Current.MainWindow.Title = DTE.MainWindow.Caption;
+					if (Application.Current.MainWindow.Title != title)
+						Application.Current.MainWindow.Title = title;
+
+					var color = TitleBarColor;
+					if (lastSetColor != color)
+					{
+						ChangeWindowTitleColor(color);
+						lastSetColor = color.Value;
+					}
 				});
 			}
 			catch (Exception e)
@@ -426,5 +657,13 @@ namespace Atma.TitleBarNone
 		private Settings.UserDirFileChangeProvider m_UserDirFileChangeProvider;
 		private Settings.VsOptionsChangeProvider m_VsOptionsChangeProvider;
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
+
+		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
+		private System.Drawing.Color lastSetColor;
+
+		private RDTWatcher rdtWatcher = new RDTWatcher();
+		private WindowFrameResponder windowFrameResponder = new WindowFrameResponder();
+
+		private OutputWindowEvents outputWindowEvents;
 	}
 }
