@@ -22,18 +22,6 @@ namespace Atma.TitleBarNone.Resolvers
 
 		public override ChangedDelegate Changed { get; set; }
 
-		// IDEResolver is the final backup for the defaults
-		public override int SatisfiesDependency(Settings.SettingsTriplet triplet)
-		{
-			int result = 0;
-			if (triplet.SolutionFilter == "")
-				result |= 0x1;
-			if (triplet.Dependency == Settings.PatternDependency.None)
-				result |= 0x2;
-
-			return result;
-		}
-
 		public override bool ResolveBoolean(VsState state, string tag)
 		{
 			if (tag == "ide-mode")

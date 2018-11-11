@@ -38,9 +38,9 @@ namespace Atma.TitleBarNone.Resolvers
 		public override string Resolve(VsState state, string tag)
 		{
 			if (tag == "vsr-branch")
-				return m_VsrBranch;
+				return vsrBranch;
 			else if (tag == "vsr-sha")
-				return m_VsrSHA;
+				return vsrSHA;
 			else
 				return "";
 		}
@@ -58,13 +58,13 @@ namespace Atma.TitleBarNone.Resolvers
 
 			if (vsrPath != null)
 			{
-				m_Watcher = new FileSystemWatcher(vsrPath)
+				watcher = new FileSystemWatcher(vsrPath)
 				{
 					IncludeSubdirectories = true
 				};
 
-				m_Watcher.Changed += VsrFolderChanged;
-				m_Watcher.EnableRaisingEvents = true;
+				watcher.Changed += VsrFolderChanged;
+				watcher.EnableRaisingEvents = true;
 
 				ReadInfo();
 			}
@@ -73,16 +73,34 @@ namespace Atma.TitleBarNone.Resolvers
 		private void OnSolutionClosed()
 		{
 			vsrPath = null;
-			if (m_Watcher != null)
+			if (watcher != null)
 			{
-				m_Watcher.EnableRaisingEvents = false;
-				m_Watcher.Dispose();
+				watcher.EnableRaisingEvents = false;
+				watcher.Dispose();
 			}
 		}
 
-		public override int SatisfiesDependency(SettingsTriplet triplet)
+		public override bool SatisfiesDependency(Tuple<string, string> d)
 		{
-			return triplet.Dependency == PatternDependency.Vsr ? 2 : 0;
+			if (!Available)
+				return false;
+
+			if (d.Item1 == "vsr-branch")
+			{
+				return GlobMatch(d.Item2, vsrBranch);
+			}
+			else if (d.Item1 == "vsr-sha")
+			{
+				return GlobMatch(d.Item2, vsrSHA);
+			}
+			else if (d.Item1 == "vsr")
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
 
 		private void VsrFolderChanged(object sender, FileSystemEventArgs e)
@@ -123,9 +141,9 @@ namespace Atma.TitleBarNone.Resolvers
 			// parse branch
 			{
 				var match = Regex.Match(lines[0], "on branch \"([a-zA-Z0-9_-]+)\"");
-				if (match.Success && m_VsrBranch != match.Groups[1].Value)
+				if (match.Success && vsrBranch != match.Groups[1].Value)
 				{
-					m_VsrBranch = match.Groups[1].Value;
+					vsrBranch = match.Groups[1].Value;
 					changed = true;
 				}
 			}
@@ -135,7 +153,7 @@ namespace Atma.TitleBarNone.Resolvers
 				var match = Regex.Match(lines[0], "Version ([a-fA-F0-9-]+)");
 				if (match.Success)
 				{
-					m_VsrSHA = match.Groups[1].Value;
+					vsrSHA = match.Groups[1].Value;
 					changed = true;
 				}
 			}
@@ -163,8 +181,8 @@ namespace Atma.TitleBarNone.Resolvers
 		}
 
 		private string vsrPath;
-		private FileSystemWatcher m_Watcher;
-		private string m_VsrBranch;
-		private string m_VsrSHA;
+		private FileSystemWatcher watcher;
+		private string vsrBranch;
+		private string vsrSHA;
 	}
 }

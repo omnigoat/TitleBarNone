@@ -1,28 +1,18 @@
 ﻿using System;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Linq;
-using System.Windows.Automation;
 using EnvDTE;
-using EnvDTE80;
-using Microsoft.VisualStudio;
-using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
-using Microsoft.Win32;
 using Task = System.Threading.Tasks.Task;
 using SettingsPageGrid = Atma.TitleBarNone.Settings.SettingsPageGrid;
 using System.Collections.Generic;
 using Atma.TitleBarNone.Resolvers;
 using System.Windows;
-using System.IO;
-using System.Windows.Interop;
+using Atma.TitleBarNone.Utilities;
 
 namespace Atma.TitleBarNone
 {
@@ -31,53 +21,6 @@ namespace Atma.TitleBarNone
 		Nothing,
 		Document,
 		Solution
-	}
-
-	static class ExtensionMethods
-	{
-		public static IEnumerable<IComparable<T>> SoDistinct<T>(this IOrderedEnumerable<T> lhs, IOrderedEnumerable<T> rhs) where T : class, IComparable<T>
-		{
-			var lhsi = lhs.GetEnumerator();
-			var rhsi = rhs.GetEnumerator();
-			bool lr = lhsi.MoveNext();
-			bool rr = rhsi.MoveNext();
-
-			var result = new List<IComparable<T>>();
-			
-			while (lr && rr)
-			{
-				var b = lhsi.Current.CompareTo(rhsi.Current as T);
-				if (b < 0)
-				{
-					result.Add(lhsi.Current);
-					lr = lhsi.MoveNext();
-				}
-				else if (0 < b)
-				{
-					result.Add(rhsi.Current);
-					rr = rhsi.MoveNext();
-				}
-				else
-				{
-					lr = lhsi.MoveNext();
-					rr = rhsi.MoveNext();
-				}
-			}
-
-			while (lr)
-			{
-				result.Add(lhsi.Current);
-				lr = lhsi.MoveNext();
-			}
-
-			while (rr)
-			{
-				result.Add(rhsi.Current);
-				rr = rhsi.MoveNext();
-			}
-
-			return result;
-		}
 	}
 
 	[PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
@@ -110,11 +53,35 @@ namespace Atma.TitleBarNone
 			get
 			{
 				if (DTE.Solution.IsOpen)
-					return FormatIfSolutionOpened?.Pattern ?? "";
+					return PatternIfSolutionOpened?.Pattern ?? "";
 				else if (DTE.Documents.Count > 0)
-					return FormatIfDocumentOpened?.Pattern ?? "";
+					return PatternIfDocumentOpened?.Pattern ?? "";
 				else
-					return FormatIfNothingOpened?.Pattern ?? "";
+					return PatternIfNothingOpened?.Pattern ?? "";
+			}
+		}
+
+		public string TitleBarText
+		{
+			get
+			{
+				string pattern = Pattern;
+				if (string.IsNullOrEmpty(pattern))
+					return null;
+
+				var state = new VsState()
+				{
+					Resolvers = Resolvers,
+					Mode = m_Mode,
+					Solution = DTE.Solution
+				};
+
+				if (Parsing.ParseFormatString(out string transformed, state, pattern))
+				{
+					return transformed;
+				}
+
+				return null;
 			}
 		}
 
@@ -123,11 +90,11 @@ namespace Atma.TitleBarNone
 			get
 			{
 				if (DTE.Solution.IsOpen)
-					return FormatIfSolutionOpened?.Color;
+					return ColorIfSolutionOpened;
 				else if (DTE.Documents.Count > 0)
-					return FormatIfDocumentOpened?.Color;
+					return ColorIfDocumentOpened;
 				else
-					return FormatIfNothingOpened?.Color;
+					return ColorIfNothingOpened;
 			}
 		}
 
@@ -144,109 +111,40 @@ namespace Atma.TitleBarNone
 			}
 		}
 
-		private Settings.TitleBarFormat FormatIfNothingOpened => SettingsTriplets
+		private System.Drawing.Color? ColorIfNothingOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => x.FormatIfNothingOpened.Color != null)
+			.FirstOrDefault()?.FormatIfNothingOpened?.Color;
+
+		private System.Drawing.Color? ColorIfDocumentOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => x.FormatIfDocumentOpened.Color != null)
+			.FirstOrDefault()?.FormatIfDocumentOpened?.Color;
+
+		private System.Drawing.Color? ColorIfSolutionOpened => SettingsTriplets
+			.Where(TripletDependenciesAreSatisfied)
+			.Where(x => x.FormatIfSolutionOpened.Color != null)
+			.FirstOrDefault()?.FormatIfSolutionOpened?.Color;
+
+		private Settings.TitleBarFormat PatternIfNothingOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfNothingOpened?.Pattern))
 			.FirstOrDefault()?.FormatIfNothingOpened;
 
-		private Settings.TitleBarFormat FormatIfDocumentOpened => SettingsTriplets
+		private Settings.TitleBarFormat PatternIfDocumentOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfDocumentOpened?.Pattern))
 			.FirstOrDefault()?.FormatIfDocumentOpened;
 
-		private Settings.TitleBarFormat FormatIfSolutionOpened => SettingsTriplets
+		private Settings.TitleBarFormat PatternIfSolutionOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
 			.Where(x => !string.IsNullOrEmpty(x.FormatIfSolutionOpened?.Pattern))
 			.FirstOrDefault()?.FormatIfSolutionOpened;
 
 		private bool TripletDependenciesAreSatisfied(Settings.SettingsTriplet triplet)
 		{
-			var result = Resolvers
-				.Where(x => x.Available)
-				.Aggregate(0, (acc, x) => {
-					return acc | x.SatisfiesDependency(triplet);
-				});
-
-			return result == 0x3;
+			return triplet.PatternDependencies.All(d => Resolvers.Any(r => r.SatisfiesDependency(d)));
 		}
-
-		internal SettingsPageGrid UISettings { get; private set; }
-
-		private bool GitIsRequired => SettingsTriplets.Any(x => x.FormatIfSolutionOpened.Pattern.Contains("$git"));
-
-		class RDTWatcher : IVsRunningDocTableEvents
-		{
-			public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
-			{
-				Debug.Print("INFO: OnAfterFirstDocumentLock");
-				return VSConstants.S_OK;
-			}
-
-			public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining)
-			{
-				Debug.Print("INFO: OnBeforeLastDocumentUnlock");
-				return VSConstants.S_OK;
-			}
-
-			public int OnAfterSave(uint docCookie)
-			{
-				Debug.Print("INFO: OnAfterSave");
-				return VSConstants.S_OK;
-			}
-
-			public int OnAfterAttributeChange(uint docCookie, uint grfAttribs)
-			{
-				Debug.Print("INFO: OnAfterAttributeChange");
-				return VSConstants.S_OK;
-			}
-
-			public int OnBeforeDocumentWindowShow(uint docCookie, int fFirstShow, IVsWindowFrame pFrame)
-			{
-				Debug.Print("INFO: OnBeforeDocumentWindowShow");
-				int r = pFrame.GetProperty((int)__VSFPROPID.VSFPROPID_CreateDocWinFlags, out object flags);
-				if (r == VSConstants.S_OK && ((int)flags & (int)__VSCREATEDOCWIN.CDW_fCreateNewWindow) != 0)
-				{
-					Debug.Print("INFO: OnBeforeDocumentWindowShow - NEW WINDOW");
-				}
-
-				return VSConstants.S_OK;
-			}
-
-			public int OnAfterDocumentWindowHide(uint docCookie, IVsWindowFrame pFrame)
-			{
-				Debug.Print("INFO: OnAfterDocumentWindowHide");
-				return VSConstants.S_OK;
-			}
-		}
-
-		class WindowFrameResponder : IVsWindowFrameEvents
-		{
-			public void OnFrameCreated(IVsWindowFrame frame)
-			{
-				Debug.Print("INFO: OnFrameCreated");
-			}
-
-			public void OnFrameDestroyed(IVsWindowFrame frame)
-			{
-				Debug.Print("INFO: OnFrameDestroyed");
-			}
-
-			public void OnFrameIsVisibleChanged(IVsWindowFrame frame, bool newIsVisible)
-			{
-				Debug.Print("INFO: OnFrameIsVisibleChanged");
-			}
-
-			public void OnFrameIsOnScreenChanged(IVsWindowFrame frame, bool newIsOnScreen)
-			{
-				Debug.Print("INFO: OnFrameIsOnScreenChanged");
-			}
-
-			public void OnActiveFrameChanged(IVsWindowFrame oldFrame, IVsWindowFrame newFrame)
-			{
-				Debug.Print("INFO: OnActiveFrameChanged");
-			}
-		}
-
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
@@ -256,6 +154,8 @@ namespace Atma.TitleBarNone
 			// create models of IDE/Solution
 			ideModel = new Models.IDEModel(DTE);
 			ideModel.WindowShown += OnWindowShowing;
+			ideModel.IdeModeChanged += (dbgDebugMode mode) => m_Mode = mode;
+			ideModel.StartupComplete += UpdateTitleAsync;
 
 			solutionModel = new Models.SolutionModel(DTE);
 			solutionModel.SolutionOpened += OnSolutionOpened;
@@ -306,285 +206,56 @@ namespace Atma.TitleBarNone
 
 		private void OnWindowShowing(EnvDTE.Window Window)
 		{
-			ChangeWindowTitleColor(TitleBarColor);
+			Application.Current?.Dispatcher?.InvokeAsync(() =>
+			{
+				ChangeWindowTitleColor(TitleBarColor);
+			});
 		}
 
 		private void UpdateTitleAsync()
 		{
 			Application.Current?.Dispatcher?.InvokeAsync(() =>
 			{
-				UpdateTitle();
+				ChangeWindowTitle(TitleBarText);
+				ChangeWindowTitleColor(TitleBarColor);
 			});
-		}
-
-		private void UpdateTitle()
-		{
-			string pattern = Pattern;
-			if (string.IsNullOrEmpty(pattern))
-				return;
-
-			var state = new VsState()
-			{
-				Mode = m_Mode,
-				Solution = DTE.Solution
-			};
-
-			int i = 0;
-			if (ParseImpl(out string transformed, state, pattern, ref i, null))
-			{
-				ChangeWindowTitle(transformed);
-			}
-		}
-
-		private bool ParseImpl(out string transformed, VsState state, string pattern, ref int i, string singleDollar)
-		{
-			transformed = "";
-
-			// begin pattern parsing
-			while (i < pattern.Length)
-			{
-				// escape sequences
-				if (pattern[i] == '\\')
-				{
-					++i;
-					if (i == pattern.Length)
-						break;
-					transformed += pattern[i];
-					++i;
-				}
-				// predicates
-				else if (pattern[i] == '?' && ParseQuestion(out string r, state, pattern, ref i, singleDollar))
-				{
-					transformed += r;
-				}
-				// dollars
-				else if (pattern[i] == '$' && ParseDollar(out string r2, state, pattern, ref i, singleDollar))
-				{
-					transformed += r2;
-				}
-				else
-				{
-					transformed += pattern[i];
-					++i;
-				}
-			}
-
-			return true;
-		}
-
-
-		private bool ParseQuestion(out string result, VsState state, string pattern, ref int i, string singleDollar)
-		{
-			var tag = new string(pattern
-				.Substring(i + 1)
-				.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
-				.ToArray());
-
-			i += 1 + tag.Length;
-
-			bool valid = m_Resolvers
-				.FirstOrDefault(x => x.Applicable(tag))
-				?.ResolveBoolean(state, tag) ?? false;
-
-			if (i == pattern.Length)
-			{
-				result = null;
-				return valid;
-			}
-
-			// look for braced group {....}, and skip if question was bad
-			if (pattern[i] == '{')
-			{
-				if (!valid)
-				{
-					while (i != pattern.Length)
-					{
-						++i;
-						if (pattern[i] == '}')
-						{
-							++i;
-							break;
-						}
-					}
-
-					result = null;
-					return false;
-				}
-				else
-				{
-					var transformed_tag = m_Resolvers
-						.FirstOrDefault(x => x.Applicable(tag))
-						?.Resolve(state, tag);
-
-					var inner = new string(pattern
-						.Substring(i + 1)
-						.TakeWhile(x => x != '}')
-						.ToArray());
-
-					i += 1 + inner.Length + 1;
-
-					int j = 0;
-					ParseImpl(out result, state, inner, ref j, transformed_tag);
-				}
-			}
-			else
-			{
-				result = null;
-				return false;
-			}
-
-			return true;
-		}
-
-		// we support two common methods of string escaping: parens and identifier
-		//
-		// any pattern that contains a $ will either be immeidately followed with an identifier,
-		// or a braced expression, e.g., $git-branch, or ${git-branch}
-		//
-		// the identifier may be a function-call, like "$path(0, 2)"
-		//
-		private bool ParseDollar(out string result, VsState state, string pattern, ref int i, string singleDollar)
-		{
-			++i;
-
-			// peek for brace vs non-brace
-			//
-			// find EOF or whitespace or number
-			if (i == pattern.Length || char.IsWhiteSpace(pattern[i]) || char.IsNumber(pattern[i]))
-			{
-				++i;
-				result = singleDollar ?? "";
-				return true;
-			}
-			// find brace
-			else if (pattern[i] == '{')
-			{
-				var braceExpr = new string(pattern
-					.Substring(i + 1)
-					.TakeWhile(x => x != '}')
-					.ToArray());
-
-				i += 1 + braceExpr.Length;
-				if (i != pattern.Length && pattern[i] == '}')
-					++i;
-
-				// maybe:
-				//  - split by whitespace
-				//  - attempt to resolve all
-				//  - join together
-				result = braceExpr.Split(' ')
-					.Select(x =>
-					{
-						return m_Resolvers
-						.FirstOrDefault(r => r.Applicable(x))
-						?.Resolve(state, x) ?? x;
-					})
-					.Aggregate((a, b) => a + " " + b);
-					
-			}
-			// find identifier
-			else if (pattern[i] >= 'a' && pattern[i] <= 'z')
-			{
-				var idenExpr = new string(pattern
-					.Substring(i)
-					.TakeWhile(x => x >= 'a' && x <= 'z' || x == '-')
-					.ToArray());
-
-				i += idenExpr.Length;
-
-				if (i != pattern.Length)
-				{
-					if (pattern[i] == '(')
-					{
-						var argExpr = new string(pattern
-							.Substring(i)
-							.TakeWhile(x => x != ')')
-							.ToArray());
-
-						i += argExpr.Length;
-						if (i != pattern.Length && pattern[i] == ')')
-						{
-							++i;
-							argExpr += ')';
-						}
-
-						idenExpr += argExpr;
-					}
-				}
-
-				result = m_Resolvers
-					.FirstOrDefault(x => x.Applicable(idenExpr))
-					?.Resolve(state, idenExpr)
-					?? idenExpr;
-			}
-			else
-			{
-				result = "";
-			}
-
-			return true;
-		}
-
-		// SERIOUSLY, we need to track which windows are new and not, so that
-		// we can track their default background colour/text colour, as to be
-		// able to reset to that when needed. if we create a new TitleBarModel
-		// every time, it'll just think the defaults are the already-coloured
-		// title bars.
-		private class ComparableWindow : IComparable<ComparableWindow>
-		{
-			public ComparableWindow(System.Windows.Window window)
-			{
-				this.Window = window;
-			}
-
-			public int CompareTo(ComparableWindow other)
-			{
-				return Window.GetHashCode().CompareTo(other.Window.GetHashCode());
-			}
-
-			public System.Windows.Window Window { get; internal set; }
 		}
 
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
+			var seenWindows = Application.Current.Windows.Cast<System.Windows.Window>();
+
+			// remove old models, set their colour back to original
+			foreach (var w in windowsAndModels.Keys.Except(seenWindows).ToList())
+			{
+				windowsAndModels[w]?.SetTitleBarColor(null);
+				windowsAndModels.Remove(w);
+			}
+
+			// add new models
+			foreach (var w in seenWindows.Except(windowsAndModels.Keys).ToList())
+			{
+				windowsAndModels[w] = new Models.TitleBarModel(w);
+			}
+
+			// colour all models
+			foreach (var model in windowsAndModels.Values)
+			{
+				model.SetTitleBarColor(color);
+			}
+		}
+
+		private void ChangeWindowTitleColorAsync(System.Drawing.Color? color)
+		{
 			Application.Current.Dispatcher.InvokeAsync(() =>
 			{
-				var seenWindows = Application.Current.Windows
-					.Cast<System.Windows.Window>()
-					.ToList();
-
-				// remove old models
-				var removableWindows = knownWindows
-					.Except(seenWindows)
-					.ToList();
-
-				foreach (var m in windowModels.Where(x => removableWindows.Where(y => y == x.Window).Count() > 0))
-				{
-					m.SetTitleBarColor(null);
-				}
-
-				windowModels.RemoveAll(x => removableWindows.Where(y => y == x.Window).Count() > 0);
-
-				// add new models & update them
-				var newWindows = seenWindows.Except(knownWindows).ToList();
-
-				var newModels = newWindows
-					.Select(x => new Models.TitleBarModel(x))
-					.ToList();
-
-				windowModels.AddRange(newModels);
-				knownWindows.AddRange(newWindows);
-				
-				foreach (var model in windowModels)
-				{
-					model.SetTitleBarColor(color);
-				}
+				ChangeWindowTitleColor(color);
 			});
 		}
 
 		private void ChangeWindowTitle(string title)
 		{
-			if (DTE == null || DTE.MainWindow == null)
+			if (title == null || DTE == null || DTE.MainWindow == null)
 				return;
 
 			if (Application.Current.MainWindow == null)
@@ -595,25 +266,26 @@ namespace Atma.TitleBarNone
 
 			try
 			{
-				ThreadHelper.Generic.Invoke(() =>
-				{
-					Application.Current.MainWindow.Title = DTE.MainWindow.Caption;
-					if (Application.Current.MainWindow.Title != title)
-						Application.Current.MainWindow.Title = title;
+				Application.Current.MainWindow.Title = DTE.MainWindow.Caption;
+				if (Application.Current.MainWindow.Title != title)
+					Application.Current.MainWindow.Title = title;
 
-					var color = TitleBarColor;
-					if (lastSetColor != color)
-					{
-						ChangeWindowTitleColor(color);
-						lastSetColor = color;
-					}
-				});
+				var color = TitleBarColor;
+				if (lastSetColor != color)
+				{
+					ChangeWindowTitleColor(color);
+					lastSetColor = color;
+				}
 			}
 			catch (Exception e)
 			{
 				Debug.Print(e.Message);
 			}
 		}
+
+
+		// UI
+		internal SettingsPageGrid UISettings { get; private set; }
 
 		// models
 		private Models.SolutionModel solutionModel;
@@ -632,7 +304,6 @@ namespace Atma.TitleBarNone
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
 		private System.Drawing.Color? lastSetColor;
 
-		private List<System.Windows.Window> knownWindows = new List<System.Windows.Window>();
-		private List<Models.TitleBarModel> windowModels = new List<Models.TitleBarModel>();
+		private Dictionary<System.Windows.Window, Models.TitleBarModel> windowsAndModels = new Dictionary<System.Windows.Window, Models.TitleBarModel>();
 	}
 }

@@ -1,4 +1,5 @@
 ﻿using EnvDTE;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -7,6 +8,7 @@ namespace Atma.TitleBarNone.Resolvers
 {
 	public struct VsState
 	{
+		public IEnumerable<Resolver> Resolvers;
 		public dbgDebugMode Mode;
 		public Solution Solution;
 	}
@@ -31,14 +33,16 @@ namespace Atma.TitleBarNone.Resolvers
 		public abstract bool ResolveBoolean(VsState state, string tag);
 		public abstract string Resolve(VsState state, string tag);
 
-		public virtual int SatisfiesDependency(Settings.SettingsTriplet triplet)
+		public virtual bool SatisfiesDependency(Tuple<string, string> d)
 		{
-			return 0;
+			return false;
 		}
 
-		protected void RaiseChange()
+		protected static bool GlobMatch(string pattern, string match)
 		{
-			Changed?.Invoke(this);
+			return string.IsNullOrEmpty(pattern) || new Regex(
+				"^" + Regex.Escape(pattern).Replace(@"\*", ".*").Replace(@"\?", ".") + "$",
+				RegexOptions.IgnoreCase | RegexOptions.Singleline).IsMatch(match);
 		}
 
 		private readonly List<string> m_Tags;

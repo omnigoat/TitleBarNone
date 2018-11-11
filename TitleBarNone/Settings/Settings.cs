@@ -5,12 +5,14 @@ using System.Globalization;
 
 namespace Atma.TitleBarNone.Settings
 {
-
-	public enum PatternDependency
+	[Flags]
+	public enum Dependencies
 	{
-		None,
-		Git,
-		Vsr
+		None = 0,
+		SolutionGlob = 1,
+		Git = 2,
+		Versionr = 4,
+		SVN = 8
 	}
 
 	public class TitleBarFormat
@@ -20,7 +22,7 @@ namespace Atma.TitleBarNone.Settings
 			Pattern = pattern;
 		}
 
-		public TitleBarFormat(string pattern, System.Drawing.Color color)
+		public TitleBarFormat(string pattern, System.Drawing.Color? color)
 		{
 			Pattern = pattern;
 			Color = color;
@@ -62,9 +64,7 @@ namespace Atma.TitleBarNone.Settings
 
 	public class SettingsTriplet
 	{
-		public PatternDependency Dependency = PatternDependency.None;
-
-		public string SolutionFilter = "";
+		public List<Tuple<string, string>> PatternDependencies = new List<Tuple<string, string>>();
 
 		public TitleBarFormat FormatIfNothingOpened;
 		public TitleBarFormat FormatIfDocumentOpened;

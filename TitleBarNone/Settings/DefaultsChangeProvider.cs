@@ -11,7 +11,6 @@ namespace Atma.TitleBarNone.Settings
 		public override List<SettingsTriplet> Triplets => new List<SettingsTriplet>
 		{
 			new SettingsTriplet {
-				Dependency = PatternDependency.None,
 				FormatIfNothingOpened = new TitleBarFormat(Defaults.PatternIfNothingOpen),
 				FormatIfDocumentOpened = new TitleBarFormat(Defaults.PatternIfDocumentOpen),
 				FormatIfSolutionOpened = new TitleBarFormat(Defaults.PatternIfSolutionOpen)

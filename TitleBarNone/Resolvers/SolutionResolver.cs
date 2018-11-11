@@ -69,9 +69,20 @@ namespace Atma.TitleBarNone.Resolvers
 				throw new InvalidOperationException();
 		}
 
-		public override int SatisfiesDependency(SettingsTriplet triplet)
+		public override bool SatisfiesDependency(Tuple<string, string> d)
 		{
-			return Regex.Match(solution.FullName, triplet.SolutionFilter).Success ? 1 : 0;
+			if (string.IsNullOrEmpty(d.Item2))
+			{
+				return false;
+			}
+			else
+			{
+				bool result = solution != null && new Regex(
+					Regex.Escape(d.Item2).Replace(@"\*", ".*").Replace(@"\?", "."),
+					RegexOptions.IgnoreCase | RegexOptions.Singleline).IsMatch(solution.FullName);
+
+				return result;
+			}
 		}
 
 		private void OnSolutionOpened(Solution solution)

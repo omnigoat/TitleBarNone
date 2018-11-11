@@ -37,9 +37,27 @@ namespace Atma.TitleBarNone.Resolvers
 
 		public override ChangedDelegate Changed { get; set; }
 
-		public override int SatisfiesDependency(SettingsTriplet triplet)
+		public override bool SatisfiesDependency(Tuple<string, string> d)
 		{
-			return triplet.Dependency == PatternDependency.Git ? 2 : 0;
+			if (!Available)
+				return false;
+
+			if (d.Item1 == "git-branch")
+			{
+				return GlobMatch(d.Item2, gitBranch);
+			}
+			else if (d.Item1 == "git-sha")
+			{
+				return GlobMatch(d.Item2, gitSha);
+			}
+			else if (d.Item1 == "git")
+			{
+				return true;
+			}
+			else
+			{
+				return false;
+			}
 		}
 
 		public override bool ResolveBoolean(VsState state, string tag)

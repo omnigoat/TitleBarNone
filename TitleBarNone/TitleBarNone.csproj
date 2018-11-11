@@ -80,6 +80,8 @@
     <Compile Include="Settings\UserDirFileChangeProvider.cs" />
     <Compile Include="Settings\VsOptionsChangeProvider.cs" />
     <Compile Include="TitleBarNonePackage.cs" />
+    <Compile Include="Utilities\ExtensionMethods.cs" />
+    <Compile Include="Utilities\Parsing.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Key.snk" />
