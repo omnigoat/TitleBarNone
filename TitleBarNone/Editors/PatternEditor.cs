@@ -69,8 +69,5 @@ namespace Atma.TitleBarNone.Editors
 
 			return "lmao no";
 		}
-
-		private TitleBarNonePackage package;
-		private IWindowsFormsEditorService m_EditorService;
 	}
 }

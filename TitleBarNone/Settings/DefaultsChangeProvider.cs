@@ -17,7 +17,9 @@ namespace Atma.TitleBarNone.Settings
 			}
 		};
 
+#pragma warning disable 67
 		public override event ChangedEvent Changed;
+#pragma warning restore 67
 
 		protected override void DisposeImpl()
 		{

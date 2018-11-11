@@ -167,7 +167,8 @@ namespace Atma.TitleBarNone
 				IDEResolver.Create(ideModel),
 				SolutionResolver.Create(solutionModel),
 				GitResolver.Create(solutionModel),
-				VsrResolver.Create(solutionModel)
+				VsrResolver.Create(solutionModel),
+				SvnResolver.Create(solutionModel)
 			};
 
 			foreach (var resolver in m_Resolvers)
