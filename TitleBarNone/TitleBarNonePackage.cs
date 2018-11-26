@@ -113,7 +113,7 @@ namespace Atma.TitleBarNone
 
 		private System.Drawing.Color? ColorIfNothingOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
-			.Where(x => x.FormatIfNothingOpened.Color != null)
+			.Where(x => x.FormatIfNothingOpened?.Color != null)
 			.FirstOrDefault()?.FormatIfNothingOpened?.Color;
 
 		private System.Drawing.Color? ColorIfDocumentOpened => SettingsTriplets

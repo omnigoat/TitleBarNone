@@ -13,6 +13,28 @@ namespace Atma.TitleBarNone.Resolvers
 		public Solution Solution;
 	}
 
+	public static class SplitFunction
+	{
+		public static string Parse(string functionName, char splitDelim, string tag, string data)
+		{
+			var m = Regex.Match(tag, $"{functionName}\\(([0-9]+), ([0-9]+)\\)");
+			if (m.Success)
+			{
+				var arg1 = int.Parse(m.Groups[1].Value);
+				var arg2 = int.Parse(m.Groups[2].Value);
+
+				return data.Split(splitDelim)
+					.Reverse()
+					.Skip(arg1)
+					.Take(arg2)
+					.Reverse()
+					.Aggregate((a, b) => a + splitDelim + b);
+			}
+
+			return "";
+		}
+	}
+
 	public abstract class Resolver
 	{
 		protected Resolver(IEnumerable<string> tags)

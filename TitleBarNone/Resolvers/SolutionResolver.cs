@@ -42,24 +42,7 @@ namespace Atma.TitleBarNone.Resolvers
 		{
 			if (tag.StartsWith("path"))
 			{
-				var m = Regex.Match(tag, "path\\(([0-9]+), ([0-9]+)\\)");
-				if (m.Success)
-				{
-					var arg1 = int.Parse(m.Groups[1].Value);
-					var arg2 = int.Parse(m.Groups[2].Value);
-
-					var result = new FileInfo(solution.FileName).Directory.FullName.Split(Path.DirectorySeparatorChar)
-						.Reverse()
-						.Skip(arg1)
-						.Take(arg2)
-						.Reverse()
-						.Aggregate((a, b) => a + Path.DirectorySeparatorChar + b);
-
-					return result;
-				}
-
-				// oh fuck we need to parse path
-				return "";
+				return SplitFunction.Parse("path", Path.DirectorySeparatorChar, tag, new FileInfo(solution.FileName).Directory.FullName);
 			}
 			else if ((tag == "solution-name" || tag == "item-name") && state.Solution?.FullName != null)
 				return Path.GetFileNameWithoutExtension(state.Solution.FullName);

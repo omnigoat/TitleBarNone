@@ -84,7 +84,8 @@ namespace Atma.TitleBarNone.Resolvers
 			if (svnPath != null)
 			{
 				fileWatcher = new FileSystemWatcher(svnPath);
-				fileWatcher.Changed += GitFolderChanged;
+				fileWatcher.Changed += SvnFolderChanged;
+				fileWatcher.IncludeSubdirectories = true;
 				fileWatcher.EnableRaisingEvents = true;
 
 				ReadInfo();
@@ -101,7 +102,7 @@ namespace Atma.TitleBarNone.Resolvers
 			}
 		}
 
-		private void GitFolderChanged(object sender, FileSystemEventArgs e)
+		private void SvnFolderChanged(object sender, FileSystemEventArgs e)
 		{
 			ReadInfo();
 		}
@@ -117,7 +118,7 @@ namespace Atma.TitleBarNone.Resolvers
 					UseShellExecute = false,
 					CreateNoWindow = true,
 					RedirectStandardOutput = true,
-					WorkingDirectory = svnPath
+					WorkingDirectory = new DirectoryInfo(svnPath)?.Parent?.FullName ?? svnPath
 				}
 			};
 
