@@ -24,6 +24,7 @@ namespace Atma.TitleBarNone.Utilities
 			{
 				groups = lines
 					.Where(x => !string.IsNullOrEmpty(x))
+					.Where(x => !x.StartsWith("#"))
 					.Aggregate(new List<List<string>>(), (acc, x) =>
 					{
 						if (Regex.Match(x, "^[a-z]").Success)
