@@ -15,5 +15,6 @@ namespace Atma.TitleBarNone.Settings
 		public const string PatternIfSolutionOpen = "$solution-name?ide-mode{ $} - $ide-name";
 
 		public const string GitPatternIfOpen = "?git{[$git-branch] }$item-name?ide-mode{ $} - $ide-name";
+		public const string VsrPatternIfOpen = "?vsr{[$vsr-branch] }$item-name?ide-mode{ $} - $ide-name";
 	}
 }

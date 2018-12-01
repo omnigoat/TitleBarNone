@@ -1,9 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="TitleBarNone.684c38e6-49bd-4989-b4fb-7d7c9003b3aa" Version="1.1" Language="en-US" Publisher="Jonathan Runting" />
+        <Identity Id="TitleBarNone.684c38e6-49bd-4989-b4fb-7d7c9003b3aa" Version="1.2" Language="en-US" Publisher="Jonathan Runting" />
         <DisplayName>TitleBarNone</DisplayName>
-        <Description xml:space="preserve">Empty VSIX Project.</Description>
+        <Description xml:space="preserve">Customise your Title Bar's text &amp; colour with rules based off the current state of your source control, the solution's path, and more!
+The best title-bar fC</Description>
     </Metadata>
     <Installation>
         <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[15.0, 16.0)" />

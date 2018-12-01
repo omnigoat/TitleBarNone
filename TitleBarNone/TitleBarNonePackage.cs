@@ -106,6 +106,7 @@ namespace Atma.TitleBarNone
 			{
 				return m_UserDirFileChangeProvider.Triplets
 					.Concat(m_SolutionsFileChangeProvider?.Triplets)
+					.Concat(m_VsOptionsChangeProvider.Triplets)
 					.Concat(m_DefaultsChangeProvider.Triplets)
 					;
 			}
@@ -118,12 +119,12 @@ namespace Atma.TitleBarNone
 
 		private System.Drawing.Color? ColorIfDocumentOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
-			.Where(x => x.FormatIfDocumentOpened.Color != null)
+			.Where(x => x.FormatIfDocumentOpened?.Color != null)
 			.FirstOrDefault()?.FormatIfDocumentOpened?.Color;
 
 		private System.Drawing.Color? ColorIfSolutionOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)
-			.Where(x => x.FormatIfSolutionOpened.Color != null)
+			.Where(x => x.FormatIfSolutionOpened?.Color != null)
 			.FirstOrDefault()?.FormatIfSolutionOpened?.Color;
 
 		private Settings.TitleBarFormat PatternIfNothingOpened => SettingsTriplets
@@ -207,10 +208,7 @@ namespace Atma.TitleBarNone
 
 		private void OnWindowShowing(EnvDTE.Window Window)
 		{
-			Application.Current?.Dispatcher?.InvokeAsync(() =>
-			{
-				ChangeWindowTitleColor(TitleBarColor);
-			});
+			ChangeWindowTitleColorAsync(TitleBarColor);
 		}
 
 		private void UpdateTitleAsync()
@@ -248,7 +246,7 @@ namespace Atma.TitleBarNone
 
 		private void ChangeWindowTitleColorAsync(System.Drawing.Color? color)
 		{
-			Application.Current.Dispatcher.InvokeAsync(() =>
+			Application.Current?.Dispatcher?.InvokeAsync(() =>
 			{
 				ChangeWindowTitleColor(color);
 			});
@@ -256,8 +254,11 @@ namespace Atma.TitleBarNone
 
 		private void ChangeWindowTitle(string title)
 		{
-			if (title == null || DTE == null || DTE.MainWindow == null)
+			if (title == null)
+			{
+				Debug.Print("ChangeWindowTitle - exiting early because title == null");
 				return;
+			}
 
 			if (Application.Current.MainWindow == null)
 			{
@@ -270,13 +271,6 @@ namespace Atma.TitleBarNone
 				Application.Current.MainWindow.Title = DTE.MainWindow.Caption;
 				if (Application.Current.MainWindow.Title != title)
 					Application.Current.MainWindow.Title = title;
-
-				var color = TitleBarColor;
-				if (lastSetColor != color)
-				{
-					ChangeWindowTitleColor(color);
-					lastSetColor = color;
-				}
 			}
 			catch (Exception e)
 			{

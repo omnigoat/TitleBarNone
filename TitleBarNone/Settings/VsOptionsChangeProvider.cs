@@ -12,21 +12,30 @@ namespace Atma.TitleBarNone.Settings
 		{
 			SettingsPage = settingsPage;
 			SettingsPage.SettingsChanged += SettingsPage_SettingsChanged;
+
+			triplet.FormatIfNothingOpened = SettingsPage.PatternIfNothingOpen;
+			triplet.FormatIfDocumentOpened = SettingsPage.PatternIfDocumentOpen;
+			triplet.FormatIfSolutionOpened = SettingsPage.PatternIfSolutionOpen;
+
+			gitTriplet.PatternDependencies.Add(Tuple.Create("git", ""));
+			gitTriplet.FormatIfSolutionOpened = SettingsPage.GitPatternIfOpen;
 		}
 
 		public override event ChangedEvent Changed;
-		public override List<SettingsTriplet> Triplets => new List<SettingsTriplet> { m_Triplet };
+		public override List<SettingsTriplet> Triplets => new List<SettingsTriplet> { gitTriplet, triplet };
 
 		private void SettingsPage_SettingsChanged(object sender, EventArgs e)
 		{
 			bool requiresUpdate =
-				(m_Triplet.FormatIfNothingOpened != SettingsPage.PatternIfNothingOpen) ||
-				(m_Triplet.FormatIfDocumentOpened != SettingsPage.PatternIfDocumentOpen) ||
-				(m_Triplet.FormatIfSolutionOpened != SettingsPage.PatternIfSolutionOpen);
+				(triplet.FormatIfNothingOpened != SettingsPage.PatternIfNothingOpen) ||
+				(triplet.FormatIfDocumentOpened != SettingsPage.PatternIfDocumentOpen) ||
+				(triplet.FormatIfSolutionOpened != SettingsPage.PatternIfSolutionOpen);
 
-			m_Triplet.FormatIfNothingOpened = SettingsPage.PatternIfNothingOpen;
-			m_Triplet.FormatIfDocumentOpened = SettingsPage.PatternIfDocumentOpen;
-			m_Triplet.FormatIfSolutionOpened = SettingsPage.PatternIfSolutionOpen;
+			triplet.FormatIfNothingOpened = SettingsPage.PatternIfNothingOpen;
+			triplet.FormatIfDocumentOpened = SettingsPage.PatternIfDocumentOpen;
+			triplet.FormatIfSolutionOpened = SettingsPage.PatternIfSolutionOpen;
+
+			gitTriplet.FormatIfSolutionOpened = SettingsPage.GitPatternIfOpen;
 
 			if (requiresUpdate)
 				Changed?.Invoke();
@@ -38,6 +47,7 @@ namespace Atma.TitleBarNone.Settings
 		}
 
 		readonly SettingsPageGrid SettingsPage;
-		private SettingsTriplet m_Triplet = new SettingsTriplet();
+		private SettingsTriplet triplet = new SettingsTriplet();
+		private SettingsTriplet gitTriplet = new SettingsTriplet();
 	}
 }
