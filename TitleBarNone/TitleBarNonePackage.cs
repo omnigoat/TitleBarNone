@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using Atma.TitleBarNone.Resolvers;
 using System.Windows;
 using Atma.TitleBarNone.Utilities;
+using Microsoft.VisualStudio;
 
 namespace Atma.TitleBarNone
 {
@@ -192,6 +193,8 @@ namespace Atma.TitleBarNone
 
 		private void OnSolutionOpened(Solution solution)
 		{
+			WriteOutput("YO OnSolutionOpened");
+
 			// reset the solution-file settings file
 			m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(solution.FileName);
 
@@ -204,6 +207,27 @@ namespace Atma.TitleBarNone
 				m_SolutionsFileChangeProvider.Dispose();
 
 			UpdateTitleAsync();
+		}
+
+		public static void WriteOutput(string str, params object[] args)
+		{
+			try
+			{
+				Application.Current.Dispatcher?.Invoke(() =>
+				{
+					var outWindow = GetGlobalService(typeof(SVsOutputWindow)) as IVsOutputWindow;
+					var generalPaneGuid = VSConstants.OutputWindowPaneGuid.DebugPane_guid;
+					if (outWindow != null)
+					{
+						outWindow.GetPane(ref generalPaneGuid, out IVsOutputWindowPane generalPane);
+						generalPane.OutputString("TitleBarNone: " + string.Format(str, args) + "\r\n");
+						generalPane.Activate();
+					}
+				});
+			}
+			catch
+			{
+			}
 		}
 
 		private void OnWindowShowing(EnvDTE.Window Window)
