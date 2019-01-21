@@ -193,7 +193,7 @@ namespace Atma.TitleBarNone
 
 		private void OnSolutionOpened(Solution solution)
 		{
-			WriteOutput("YO OnSolutionOpened");
+			WriteOutput("OnSolutionOpened");
 
 			// reset the solution-file settings file
 			m_SolutionsFileChangeProvider = new Settings.SolutionFileChangeProvider(solution.FileName);
@@ -321,7 +321,6 @@ namespace Atma.TitleBarNone
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
 
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
-		private System.Drawing.Color? lastSetColor;
 
 		private Dictionary<System.Windows.Window, Models.TitleBarModel> windowsAndModels = new Dictionary<System.Windows.Window, Models.TitleBarModel>();
 	}

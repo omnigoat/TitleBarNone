@@ -115,7 +115,7 @@ namespace Atma.TitleBarNone.Resolvers
 				StartInfo = new System.Diagnostics.ProcessStartInfo()
 				{
 					FileName = "vsr.exe",
-					Arguments = "info",
+					Arguments = "info --nocolours",
 					UseShellExecute = false,
 					CreateNoWindow = true,
 					RedirectStandardOutput = true,

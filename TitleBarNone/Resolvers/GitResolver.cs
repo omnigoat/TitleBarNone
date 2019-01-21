@@ -15,15 +15,6 @@ namespace Atma.TitleBarNone.Resolvers
 			return new GitResolver(solutionModel);
 		}
 
-		public static bool Required(out string outpath, string path)
-		{
-			outpath = GetAllParentDirectories(new DirectoryInfo(path))
-				.SelectMany(x => x.GetDirectories())
-				.FirstOrDefault(x => x.Name == ".git")?.FullName;
-
-			return outpath != null;
-		}
-
 		public GitResolver(Models.SolutionModel solutionModel)
 			: base(new[] { "git", "git-branch", "git-sha" })
 		{
@@ -83,8 +74,8 @@ namespace Atma.TitleBarNone.Resolvers
 			var solutionDir = new FileInfo(solution.FileName).Directory;
 
 			gitPath = GetAllParentDirectories(solutionDir)
-					.SelectMany(x => x.GetDirectories())
-					.FirstOrDefault(x => x.Name == ".git")?.FullName;
+				.SelectMany(x => x.GetDirectories())
+				.FirstOrDefault(x => x.Name == ".git")?.FullName;
 
 			if (gitPath != null)
 			{
