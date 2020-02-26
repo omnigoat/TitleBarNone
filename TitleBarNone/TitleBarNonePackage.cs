@@ -25,10 +25,12 @@ namespace Atma.TitleBarNone
 	}
 
 	[PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
+	//[ProvideService(typeof(]
 	[InstalledProductRegistration("#110", "#112", "1.0", IconResourceID = 400)]
 	[Guid(PackageGuidString)]
 	[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1650:ElementDocumentationMustBeSpelledCorrectly", Justification = "pkgdef, VS and vsixmanifest are valid VS terms")]
-	[ProvideAutoLoad(UIContextGuids.NoSolution)]
+	//[ProvideAutoLoad(UIContextGuids.NoSolution)]
+	[ProvideAutoLoad(UIContextGuids.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
 	[ProvideOptionPage(typeof(SettingsPageGrid), "Title Bar None", "Settings", 101, 1000, true)]
 	public class TitleBarNonePackage : AsyncPackage
 	{
@@ -178,6 +180,8 @@ namespace Atma.TitleBarNone
 				resolver.Changed += (Resolver r) => UpdateTitleAsync();
 			}
 
+			
+
 			// create settings readers for user-dir
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
 			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
@@ -244,6 +248,16 @@ namespace Atma.TitleBarNone
 			});
 		}
 
+		private Models.TitleBarModel MakeTitleBarModel(System.Windows.Window x)
+		{
+			if (IsMsvc2017)
+				return new Models.TitleBarModel2017(x);
+			else if (IsMsvc2019)
+				return new Models.TitleBarModel2019(x);
+			else
+				return null;
+		}
+
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
 			var seenWindows = Application.Current.Windows.Cast<System.Windows.Window>();
@@ -256,10 +270,14 @@ namespace Atma.TitleBarNone
 			}
 
 			// add new models
-			foreach (var w in seenWindows.Except(windowsAndModels.Keys).ToList())
-			{
-				windowsAndModels[w] = new Models.TitleBarModel(w);
-			}
+			var newWindows = seenWindows
+				.Except(windowsAndModels.Keys.ToList())
+				.Select(x => MakeTitleBarModel(x))
+				.ToDictionary(s => s.Window, s => s as Models.TitleBarModel);
+
+			windowsAndModels = windowsAndModels
+				.Concat(newWindows)
+				.ToDictionary(s => s.Key, s => s.Value);
 
 			// colour all models
 			foreach (var model in windowsAndModels.Values)
@@ -302,6 +320,8 @@ namespace Atma.TitleBarNone
 			}
 		}
 
+		private bool IsMsvc2017 => DTE.Version.StartsWith("15");
+		private bool IsMsvc2019 => DTE.Version.StartsWith("16");
 
 		// UI
 		internal SettingsPageGrid UISettings { get; private set; }

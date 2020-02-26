@@ -13,6 +13,7 @@ namespace Atma.TitleBarNone.Models
 			solutionEvents.Opened += () => SolutionOpened?.Invoke(this.dte.Solution);
 			solutionEvents.AfterClosing += () => SolutionClosed?.Invoke();
 			
+			
 			StartupSolution = dte.Solution;
 		}
 
