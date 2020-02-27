@@ -256,59 +256,48 @@ namespace Atma.TitleBarNone
 				return null;
 		}
 
-		private Tuple<List<System.Windows.Window>, List<System.Windows.Window>> WindowsLostAndDiscovered
+		private List<Models.TitleBarModel> knownWindowModels = new List<Models.TitleBarModel>();
+
+		private Tuple<List<Models.TitleBarModel>, List<Models.TitleBarModel>> WindowsLostAndDiscovered
 		{
 			get
 			{
 				var seenWindows = Application.Current.Windows.Cast<System.Windows.Window>();
 
 				var lost = knownWindowModels
-					.Select(x => x.Window)
-					.Except(seenWindows)
+					.Where(x => !seenWindows.Contains(x.Window))
 					.ToList();
 
 				var discovered = seenWindows
-					.Except(windowsAndModels.Keys.ToList())
+					.Except(knownWindowModels.Select(x => x.Window))
 					.Select(x => MakeTitleBarModel(x))
-					.ToDictionary(s => s.Window, s => s as Models.TitleBarModel);
+					.ToList();
 
-				windowsAndModels = windowsAndModels.Concat(discovered).ToDictionary(s => s.Key, s => s.Value);
+				var lostWindows = lost.Select(x => x.Window);
 
-				return Tuple.Create(forgotten, discovered.Keys.ToList());
+				knownWindowModels = knownWindowModels
+					.Where(x => !lostWindows.Contains(x.Window))
+					.Concat(discovered)
+					.ToList();
+
+				return Tuple.Create(lost, discovered);
 			}
 		}
 
-		private IEnumerable<System.Windows.Window> WindowsDiscovered =>
-			
-
-
-
-
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
-			var seenWindows = Application.Current.Windows.Cast<System.Windows.Window>();
+			var (lost, _) = WindowsLostAndDiscovered;
 
-			// remove old models, set their colour back to original
-			foreach (var w in windowsAndModels.Keys.Except(seenWindows).ToList())
+			// set old models' colour back to original
+			foreach (var x in lost)
 			{
-				windowsAndModels[w]?.SetTitleBarColor(null);
-				windowsAndModels.Remove(w);
+				x.SetTitleBarColor(null);
 			}
 
-			// add new models
-			var newWindows = seenWindows
-				.Except(windowsAndModels.Keys.ToList())
-				.Select(x => MakeTitleBarModel(x))
-				.ToDictionary(s => s.Window, s => s as Models.TitleBarModel);
-
-			windowsAndModels = windowsAndModels
-				.Concat(newWindows)
-				.ToDictionary(s => s.Key, s => s.Value);
-
 			// colour all models
-			foreach (var model in windowsAndModels.Values)
+			foreach (var x in knownWindowModels)
 			{
-				model.SetTitleBarColor(color);
+				x.SetTitleBarColor(color);
 			}
 		}
 
@@ -367,8 +356,5 @@ namespace Atma.TitleBarNone
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
 
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
-
-		//private Dictionary<System.Windows.Window, Models.TitleBarModel> windowsAndModels = new Dictionary<System.Windows.Window, Models.TitleBarModel>();
-		private List<Models.TitleBarModel> knownWindowModels = new List<Models.TitleBarModel>();
 	}
 }
