@@ -5,6 +5,9 @@ using System.Windows.Controls;
 using System.Linq;
 using System.Collections.Generic;
 using System.Collections;
+using System.Windows.Markup;
+using System.IO;
+using System.Xml;
 
 namespace Atma.TitleBarNone.Models
 {
@@ -182,10 +185,24 @@ namespace Atma.TitleBarNone.Models
 					var titleBar = window.GetElement<Border>("MainWindowTitleBar");
 					var rootGrid = titleBar.GetElement<Grid>(max_depth: 1);
 					var infoElement = rootGrid?.GetElement<ContentControl>("PART_SolutionInfoControlHost");
-					var iegrid = rootGrid?.GetElement<Grid>();
+					var iegrid = infoElement?.GetElement<Grid>();
 					this.titleBarBorder = infoElement?.GetElement<Border>("TextBorder");
 					this.titleBarTextBox = this.titleBarBorder?.GetElement<TextBlock>();
 					//iegrid.Children.Add(this.titleBarBorder);
+
+					//string gridXaml = XamlWriter.Save(this.titleBarBorder);
+					//StringReader stringReader = new StringReader(gridXaml);
+					//XmlReader xmlReader = XmlReader.Create(stringReader);
+					//Border newGrid = (Border)XamlReader.Load(xmlReader);
+					var blam = new TextBlock();
+					blam.Name = "Jontrol";
+					blam.Background = titleBarBorder.Background;
+					//blam.BorderBrush = titleBarBorder.BorderBrush;
+					//blam.BorderThickness = titleBarBorder.BorderThickness;
+					blam.DataContext = titleBarBorder.DataContext;
+					blam.Text = "hello there";
+
+					iegrid.Children.Add(blam);
 				}
 				// haha, do something else?
 				else

@@ -180,8 +180,6 @@ namespace Atma.TitleBarNone
 				resolver.Changed += (Resolver r) => UpdateTitleAsync();
 			}
 
-			
-
 			// create settings readers for user-dir
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
 			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
@@ -257,6 +255,34 @@ namespace Atma.TitleBarNone
 			else
 				return null;
 		}
+
+		private Tuple<List<System.Windows.Window>, List<System.Windows.Window>> WindowsLostAndDiscovered
+		{
+			get
+			{
+				var seenWindows = Application.Current.Windows.Cast<System.Windows.Window>();
+
+				var lost = knownWindowModels
+					.Select(x => x.Window)
+					.Except(seenWindows)
+					.ToList();
+
+				var discovered = seenWindows
+					.Except(windowsAndModels.Keys.ToList())
+					.Select(x => MakeTitleBarModel(x))
+					.ToDictionary(s => s.Window, s => s as Models.TitleBarModel);
+
+				windowsAndModels = windowsAndModels.Concat(discovered).ToDictionary(s => s.Key, s => s.Value);
+
+				return Tuple.Create(forgotten, discovered.Keys.ToList());
+			}
+		}
+
+		private IEnumerable<System.Windows.Window> WindowsDiscovered =>
+			
+
+
+
 
 		private void ChangeWindowTitleColor(System.Drawing.Color? color)
 		{
@@ -342,6 +368,7 @@ namespace Atma.TitleBarNone
 
 		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
 
-		private Dictionary<System.Windows.Window, Models.TitleBarModel> windowsAndModels = new Dictionary<System.Windows.Window, Models.TitleBarModel>();
+		//private Dictionary<System.Windows.Window, Models.TitleBarModel> windowsAndModels = new Dictionary<System.Windows.Window, Models.TitleBarModel>();
+		private List<Models.TitleBarModel> knownWindowModels = new List<Models.TitleBarModel>();
 	}
 }
