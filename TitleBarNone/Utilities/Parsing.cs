@@ -78,7 +78,7 @@ namespace Atma.TitleBarNone.Utilities
 
 				System.Drawing.Color? drawColor = maybeColor.NullOr(c => System.Drawing.Color.FromArgb(c.R, c.G, c.B));
 
-				triplet.FormatIfNothingOpened = null;
+				triplet.FormatIfNothingOpened = new TitleBarFormat(null, drawColor);
 				triplet.FormatIfDocumentOpened = new TitleBarFormat(document, drawColor);
 				triplet.FormatIfSolutionOpened = new TitleBarFormat(solution, drawColor);
 				triplets.Add(triplet);

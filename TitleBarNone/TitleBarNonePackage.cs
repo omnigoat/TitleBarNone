@@ -108,8 +108,8 @@ namespace Atma.TitleBarNone
 			get
 			{
 				return m_UserDirFileChangeProvider.Triplets
-					.Concat(m_SolutionsFileChangeProvider?.Triplets)
-					.Concat(m_VsOptionsChangeProvider.Triplets)
+					.Concat(m_SolutionsFileChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
+					.Concat(m_VsOptionsChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
 					.Concat(m_DefaultsChangeProvider.Triplets)
 					;
 			}
@@ -152,6 +152,9 @@ namespace Atma.TitleBarNone
 
 		protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
 		{
+			// switch to UI thread
+			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+
 			// initialize the DTE and bind events
 			DTE = await GetServiceAsync(typeof(DTE)) as DTE;
 
@@ -184,13 +187,21 @@ namespace Atma.TitleBarNone
 			m_UserDirFileChangeProvider = new Settings.UserDirFileChangeProvider();
 			m_UserDirFileChangeProvider.Changed += UpdateTitleAsync;
 
-			// switch to UI thread
-			await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
 			// get UI settings hooks
 			UISettings = GetDialogPage(typeof(SettingsPageGrid)) as SettingsPageGrid;
 			m_VsOptionsChangeProvider = new Settings.VsOptionsChangeProvider(UISettings);
 			m_VsOptionsChangeProvider.Changed += UpdateTitleAsync;
+
+
+			// async initialize window state in case this plugin loaded after the
+			// IDE was brought up, because this plugin loads async to the UI
+			Application.Current.Dispatcher.InvokeAsync(() =>
+			{
+				var (_, discovered) = WindowsLostAndDiscovered;
+				foreach (var w in discovered)
+					w.SetTitleBarColor(TitleBarColor);
+			});
 		}
 
 		private void OnSolutionOpened(Solution solution)
@@ -246,16 +257,6 @@ namespace Atma.TitleBarNone
 			});
 		}
 
-		private Models.TitleBarModel MakeTitleBarModel(System.Windows.Window x)
-		{
-			if (IsMsvc2017)
-				return new Models.TitleBarModel2017(x);
-			else if (IsMsvc2019)
-				return new Models.TitleBarModel2019(x);
-			else
-				return null;
-		}
-
 		private List<Models.TitleBarModel> knownWindowModels = new List<Models.TitleBarModel>();
 
 		private Tuple<List<Models.TitleBarModel>, List<Models.TitleBarModel>> WindowsLostAndDiscovered
@@ -270,7 +271,8 @@ namespace Atma.TitleBarNone
 
 				var discovered = seenWindows
 					.Except(knownWindowModels.Select(x => x.Window))
-					.Select(x => MakeTitleBarModel(x))
+					.Select(x => Models.TitleBarModel.Make(DTE.Version, x))
+					.Where(x => x != null)
 					.ToList();
 
 				var lostWindows = lost.Select(x => x.Window);
@@ -335,9 +337,6 @@ namespace Atma.TitleBarNone
 			}
 		}
 
-		private bool IsMsvc2017 => DTE.Version.StartsWith("15");
-		private bool IsMsvc2019 => DTE.Version.StartsWith("16");
-
 		// UI
 		internal SettingsPageGrid UISettings { get; private set; }
 
@@ -354,7 +353,5 @@ namespace Atma.TitleBarNone
 		private Settings.UserDirFileChangeProvider m_UserDirFileChangeProvider;
 		private Settings.VsOptionsChangeProvider m_VsOptionsChangeProvider;
 		private Settings.DefaultsChangeProvider m_DefaultsChangeProvider = new Settings.DefaultsChangeProvider();
-
-		private readonly int currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id;
 	}
 }
