@@ -291,6 +291,8 @@ namespace Atma.TitleBarNone.Models
 					Window.Title = title;
 			}
 
+			var k = PrimeTitleInfoBlock;
+
 			// title-bar-infos for visual studio 2019
 			{
 				// something something
@@ -343,7 +345,8 @@ namespace Atma.TitleBarNone.Models
 
 					// this is almost certainly wrong, as if the main window isn't focused when
 					// it loads, we might get a completely different colour
-					defaultTitleInfoBlockForeground = x.TextBox.GetType().GetProperty("Foreground").GetValue(x.TextBox) as Brush;
+					//var s = Application.Current.FindResource(typeof(TextBlock)) as Style;
+					//defaultTitleInfoBlockForeground = x.TextBox.GetType().GetProperty("Foreground").GetValue(x.TextBox) as Brush;
 				}));
 
 		private List<TitleInfoBlock> cachedAdditionalTitleBarInfoBlocks = null;

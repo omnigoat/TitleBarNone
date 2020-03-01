@@ -64,6 +64,16 @@ namespace Atma.TitleBarNone
 			}
 		}
 
+		internal Models.TitleBarData TitleBarData =>
+			SettingsTriplets
+				.Where(TripletDependenciesAreSatisfied)
+				.Select(TitleBarFormatRightNow)
+				.Aggregate(new Models.TitleBarData(), (acc, x) =>
+				{
+					acc.TitleBarBackgroundColor = acc.TitleBarBackgroundColor ?? x.BackgroundBrush;
+					acc.TitleBarForegroundColor = acc.TitleBarForegroundColor ?? new System.Windows.Media.SolidColorBrush(x.Color ?? System.Drawing.SystemColors.ActiveCaption);
+				});
+
 		public string TitleBarText
 		{
 			get
@@ -101,19 +111,23 @@ namespace Atma.TitleBarNone
 			}
 		}
 
+		private Settings.TitleBarFormat TitleBarFormatRightNow(Settings.SettingsTriplet st)
+		{
+			if (DTE.Solution.IsOpen)
+				return st.FormatIfSolutionOpened;
+			else if (DTE.Documents.Count > 0)
+				return st.FormatIfDocumentOpened;
+			else
+				return st.FormatIfNothingOpened;
+		}
+
 		private IEnumerable<Resolver> Resolvers => m_Resolvers.AsEnumerable().Reverse();
 
-		private IEnumerable<Settings.SettingsTriplet> SettingsTriplets
-		{
-			get
-			{
-				return m_UserDirFileChangeProvider.Triplets
-					.Concat(m_SolutionsFileChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
-					.Concat(m_VsOptionsChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
-					.Concat(m_DefaultsChangeProvider.Triplets)
-					;
-			}
-		}
+		private IEnumerable<Settings.SettingsTriplet> SettingsTriplets =>
+			m_UserDirFileChangeProvider.Triplets
+				.Concat(m_SolutionsFileChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
+				.Concat(m_VsOptionsChangeProvider?.Triplets ?? new List<Settings.SettingsTriplet>())
+				.Concat(m_DefaultsChangeProvider.Triplets);
 
 		private System.Drawing.Color? ColorIfNothingOpened => SettingsTriplets
 			.Where(TripletDependenciesAreSatisfied)

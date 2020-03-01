@@ -14,6 +14,7 @@ namespace Atma.TitleBarNone.Utilities
 {
 	static class Parsing
 	{
+		//public static List<>
 		public static List<SettingsTriplet> ParseLines(List<string> lines)
 		{
 			var triplets = new List<SettingsTriplet>();
@@ -76,7 +77,7 @@ namespace Atma.TitleBarNone.Utilities
 				solution = solution ?? item ?? "";
 				document = document ?? item ?? "";
 
-				System.Drawing.Color? drawColor = maybeColor.NullOr(c => System.Drawing.Color.FromArgb(c.R, c.G, c.B));
+				var drawColor = maybeColor.NullOr(c => Color.FromRgb(c.R, c.G, c.B));
 
 				triplet.FormatIfNothingOpened = new TitleBarFormat(null, drawColor);
 				triplet.FormatIfDocumentOpened = new TitleBarFormat(document, drawColor);

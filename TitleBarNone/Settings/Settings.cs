@@ -22,14 +22,17 @@ namespace Atma.TitleBarNone.Settings
 			Pattern = pattern;
 		}
 
-		public TitleBarFormat(string pattern, System.Drawing.Color? color)
+		public TitleBarFormat(string pattern, System.Windows.Media.Color? color)
 		{
 			Pattern = pattern;
-			Color = color;
+
+			if (color != null)
+				ForegroundBrush = new System.Windows.Media.SolidColorBrush(color.Value);
 		}
 
 		public string Pattern;
-		public System.Drawing.Color? Color;
+		public System.Windows.Media.Brush ForegroundBrush;
+		public System.Windows.Media.Brush BackgroundBrush;
 	}
 
 	public class TitleBarFormatConverter : TypeConverter
@@ -69,6 +72,9 @@ namespace Atma.TitleBarNone.Settings
 		public TitleBarFormat FormatIfNothingOpened;
 		public TitleBarFormat FormatIfDocumentOpened;
 		public TitleBarFormat FormatIfSolutionOpened;
+
+		// vs2019
+		public List<TitleBarFormat> TextInfos;
 	}
 
 }
