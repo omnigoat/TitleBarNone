@@ -49,6 +49,33 @@ namespace Atma.TitleBarNone.Models
 
 			return children;
 		}
+
+		public static T WithNotNull<T>(this T o, Action<T> f)
+			where T : class
+		{
+			if (o != null)
+				f(o);
+
+			return o;
+		}
+
+		//public static R WithNotNull<R, T>(this T o, Func<T, R> f)
+		//	where T : class
+		//{
+		//	if (o != null)
+		//		return f(o);
+		//	else
+		//		return default;
+		//}
+	}
+
+	internal struct TitleBarData
+	{
+		public string TitleBarText;
+		public Brush TitleBarBackgroundColor;
+		public Brush TitleBarForegroundColor;
+
+		public List<TitleBarData> Infos;
 	}
 
 	internal abstract class TitleBarModel
@@ -67,7 +94,9 @@ namespace Atma.TitleBarNone.Models
 				else if (IsMsvc2019(vsVersion))
 					return new TitleBarModel2019(x);
 			}
-			catch { }
+			catch
+			{
+			}
 
 			return null;
 		}
@@ -75,22 +104,20 @@ namespace Atma.TitleBarNone.Models
 
 		public Window Window { get; private set; }
 
-		public System.Linq.Expressions.Expression Expression => throw new NotImplementedException();
-
-		public Type ElementType => throw new NotImplementedException();
-
-		public IQueryProvider Provider => throw new NotImplementedException();
+		public abstract void UpdateTitleBar(TitleBarData data);
 
 		public void SetTitleBarColor(System.Drawing.Color? color)
 		{
+			UpdateTitleBar(new TitleBarData());
+#if false
 			try
 			{
 				CalculateColors(color, out Brush backgroundColor, out Brush textColor);
 				
-				if (titleBarContainer != null)
+				if (titleBar != null)
 				{
-					System.Reflection.PropertyInfo propertyInfo = titleBarContainer.GetType().GetProperty(ColorPropertyName);
-					propertyInfo.SetValue(titleBarContainer, backgroundColor, null);
+					System.Reflection.PropertyInfo propertyInfo = titleBar.GetType().GetProperty(ColorPropertyName);
+					propertyInfo.SetValue(titleBar, backgroundColor, null);
 				}
 				else if (titleBarBorder != null)
 				{
@@ -107,6 +134,7 @@ namespace Atma.TitleBarNone.Models
 			{
 				System.Diagnostics.Debug.Fail("TitleBarModel.SetTitleBarColor - couldn't :(");
 			}
+#endif
 		}
 
 		public void CalculateColors(System.Drawing.Color? color, out Brush backgroundColor, out Brush textColor)
@@ -131,12 +159,12 @@ namespace Atma.TitleBarNone.Models
 		}
 
 		// visual-studio 2017 & 2019
-		protected DependencyObject titleBarContainer = null;
+		//protected UIElement titleBar = null;
 
 		// background-color
-		protected Border titleBarBorder = null;
+		//protected Border titleBarBorder = null;
 		// textbox
-		protected TextBlock titleBarTextBox = null;
+		//protected TextBlock titleBarTextBox = null;
 
 		protected Brush defaultBackgroundValue;
 		protected Brush defaultTextForeground;
@@ -151,6 +179,7 @@ namespace Atma.TitleBarNone.Models
 	{
 		public TitleBarModel2017(Window window) : base(window)
 		{
+#if false
 			try
 			{
 				// set title bar of main window
@@ -159,9 +188,9 @@ namespace Atma.TitleBarNone.Models
 					var windowContentPresenter = VisualTreeHelper.GetChild(window, 0);
 					var rootGrid = VisualTreeHelper.GetChild(windowContentPresenter, 0);
 
-					titleBarContainer = VisualTreeHelper.GetChild(rootGrid, 0);
+					titleBar = VisualTreeHelper.GetChild(rootGrid, 0);
 
-					var dockPanel = VisualTreeHelper.GetChild(titleBarContainer, 0);
+					var dockPanel = VisualTreeHelper.GetChild(titleBar, 0);
 					titleBarTextBox = VisualTreeHelper.GetChild(dockPanel, 3) as TextBlock;
 				}
 				// haha, do something else?
@@ -173,21 +202,21 @@ namespace Atma.TitleBarNone.Models
 						return;
 
 					var rootDockPanel = VisualTreeHelper.GetChild(rootGrid, 0);
-					var titleBarContainer = VisualTreeHelper.GetChild(rootDockPanel, 0);
-					var titleBar = VisualTreeHelper.GetChild(titleBarContainer, 0);
+					var titleBar = VisualTreeHelper.GetChild(rootDockPanel, 0);
+					var titleBar = VisualTreeHelper.GetChild(titleBar, 0);
 					var border = VisualTreeHelper.GetChild(titleBar, 0);
 					var contentPresenter = VisualTreeHelper.GetChild(border, 0);
 					var grid = VisualTreeHelper.GetChild(contentPresenter, 0);
 
-					this.titleBarContainer = grid;
+					this.titleBar = grid;
 
 					this.titleBarTextBox = VisualTreeHelper.GetChild(grid, 1) as TextBlock;
 				}
 
-				if (this.titleBarContainer != null)
+				if (this.titleBar != null)
 				{
-					System.Reflection.PropertyInfo propertyInfo = this.titleBarContainer.GetType().GetProperty(ColorPropertyName);
-					this.defaultBackgroundValue = propertyInfo.GetValue(this.titleBarContainer) as Brush;
+					System.Reflection.PropertyInfo propertyInfo = this.titleBar.GetType().GetProperty(ColorPropertyName);
+					this.defaultBackgroundValue = propertyInfo.GetValue(this.titleBar) as Brush;
 				}
 
 				if (this.titleBarTextBox != null)
@@ -198,88 +227,169 @@ namespace Atma.TitleBarNone.Models
 			catch
 			{
 			}
+#endif
+		}
+
+		public override void UpdateTitleBar(TitleBarData data)
+		{
+			throw new NotImplementedException();
 		}
 	}
 
+	internal class TitleInfoBlock
+	{
+		public static TitleInfoBlock Make(Border border)
+		{
+			if (border == null)
+				return null;
+			else
+				return new TitleInfoBlock(border);
+		}
+
+		public TitleInfoBlock(Border border)
+		{
+			Border = border;
+			TextBox = border.GetElement<TextBlock>();
+		}
+
+		public readonly Border Border;
+		public readonly TextBlock TextBox;
+	}
+
+
+
+
+
+
 	internal class TitleBarModel2019 : TitleBarModel
 	{
-		protected class TitleLabel
+		public TitleBarModel2019(Window window)
+			: base(window)
+		{ }
+
+		public override void UpdateTitleBar(TitleBarData data)
 		{
-			public TitleLabel(Border border)
+			// title-bar background
+			if (MainTitleBar != null)
 			{
-				titleBarBorder = border;
-				titleBarTextBox = titleBarBorder?.GetElement<TextBlock>();
+				{
+					System.Reflection.PropertyInfo property = MainTitleBar.GetType().GetProperty("Background");
+					property.SetValue(MainTitleBar, data.TitleBarBackgroundColor ?? defaultMainTitleBarBackground, null);
+				}
+
+				// title-bar foreground
+				{
+					//System.Reflection.PropertyInfo property = MainTitleBar.GetType().GetProperty("Foreground");
+					//property.SetValue(MainTitleBar, data.TitleBarForegroundColor ?? defaultMainTitleBarForeground, null);
+				}
 			}
 
-			// background-color
-			protected Border titleBarBorder = null;
-			// textbox
-			protected TextBlock titleBarTextBox = null;
-		}
-
-		public TitleBarModel2019(Window window) : base(window)
-		{
-			// set title bar of main window
-			if (window == Application.Current.MainWindow)
+			// title-bar text
 			{
-				DeconstructMainWindow(window);
-			}
-			// haha, do something else?
-			else
-			{
-				var windowContentPresenter = VisualTreeHelper.GetChild(window, 0);
-				var rootGrid = VisualTreeHelper.GetChild(windowContentPresenter, 0);
-				if (VisualTreeHelper.GetChildrenCount(rootGrid) == 0)
-					return;
-
-				var rootDockPanel = VisualTreeHelper.GetChild(rootGrid, 0);
-				var titleBarContainer = VisualTreeHelper.GetChild(rootDockPanel, 0);
-				var titleBar = VisualTreeHelper.GetChild(titleBarContainer, 0);
-				var border = VisualTreeHelper.GetChild(titleBar, 0);
-				var contentPresenter = VisualTreeHelper.GetChild(border, 0);
-				var grid = VisualTreeHelper.GetChild(contentPresenter, 0);
-
-				this.titleBarContainer = grid;
-
-				this.titleBarTextBox = VisualTreeHelper.GetChild(grid, 1) as TextBlock;
+				var title = data.TitleBarText ?? defaultMainTitleBarText;
+				if (Window.Title != title)
+					Window.Title = title;
 			}
 
-			if (this.titleBarContainer != null)
+			// title-bar-infos for visual studio 2019
 			{
-				System.Reflection.PropertyInfo propertyInfo = this.titleBarContainer.GetType().GetProperty(ColorPropertyName);
-				this.defaultBackgroundValue = propertyInfo.GetValue(this.titleBarContainer) as Brush;
-			}
-
-			if (this.titleBarTextBox != null)
-			{
-				this.defaultTextForeground = this.titleBarTextBox.Foreground;
+				// something something
 			}
 		}
 
+		public bool IsMainWindow => Window != null && Window == Application.Current.MainWindow;
 
-
-
-		protected void DeconstructMainWindow(Window window)
+		private UIElement cachedMainTitleBar;
+		private Brush defaultMainTitleBarBackground;
+		private Brush defaultMainTitleBarForeground;
+		private string defaultMainTitleBarText;
+		protected UIElement MainTitleBar
 		{
-			var windowContentPresenter = VisualTreeHelper.GetChild(window, 0);
+			get
+			{
+				if (cachedMainTitleBar != null)
+					return cachedMainTitleBar;
 
-			// get containing title-bar
-			titleBarContainer = window.GetElement<Border>("MainWindowTitleBar");
+				cachedMainTitleBar = IsMainWindow
+					? Window.GetElement<Border>("MainWindowTitleBar")
+					: Window.GetElement<Border>("MainWindowTitleBar");
 
+				if (cachedMainTitleBar != null)
+				{
+					System.Reflection.PropertyInfo backgroundProp = cachedMainTitleBar.GetType().GetProperty("Background");
+					defaultMainTitleBarBackground = backgroundProp.GetValue(cachedMainTitleBar) as Brush;
+
+					//System.Reflection.PropertyInfo foregroundProp = cachedMainTitleBar.GetType().GetProperty("Foreground");
+					//defaultMainTitleBarBackground = foregroundProp.GetValue(cachedMainTitleBar) as Brush;
+
+					defaultMainTitleBarText = Window.Title;
+				}
+
+				return cachedMainTitleBar;
+			}
+		}
+
+		private TitleInfoBlock cachedPrimeTitleInfoBlock;
+		private Brush defaultTitleInfoBlockBackground;
+		private Brush defaultTitleInfoBlockForeground;
+		protected TitleInfoBlock PrimeTitleInfoBlock =>
+			cachedPrimeTitleInfoBlock ??
+			(cachedPrimeTitleInfoBlock = (TitleInfoBlock)ModifyTitleBarInfoGrid() ?? TitleInfoBlock.Make(MainTitleBar
+				?.GetElement<ContentControl>("PART_SolutionInfoControlHost")
+				?.GetElement<Border>("TextBorder"))
+				?.WithNotNull(x =>
+				{
+					defaultTitleInfoBlockBackground = x.Border.GetType().GetProperty("Background").GetValue(x.Border) as Brush;
+
+					// this is almost certainly wrong, as if the main window isn't focused when
+					// it loads, we might get a completely different colour
+					defaultTitleInfoBlockForeground = x.TextBox.GetType().GetProperty("Foreground").GetValue(x.TextBox) as Brush;
+				}));
+
+		private List<TitleInfoBlock> cachedAdditionalTitleBarInfoBlocks = null;
+		protected List<TitleInfoBlock> AdditionalTitleBarInfoBlocks =>
+			cachedAdditionalTitleBarInfoBlocks ??
+			(cachedAdditionalTitleBarInfoBlocks = (List<TitleInfoBlock>)ModifyTitleBarInfoGrid() ??
+				new List<TitleInfoBlock>());
+
+		private bool cachedTitleBarInfoGridModified = false;
+		protected object ModifyTitleBarInfoGrid()
+		{
+			if (cachedTitleBarInfoGridModified)
+				return null;
+
+			MainTitleBar
+				?.GetElement<ContentControl>("PART_SolutionInfoControlHost")
+				?.GetElement<Grid>()
+				?.WithNotNull(x =>
+				{
+					x.ColumnDefinitions[1].Width = GridLength.Auto;
+					x.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+					cachedTitleBarInfoGridModified = true;
+				});
+
+			return null;
+		}
+
+		//protected void LayoutTitleBarInfos(IEnumerable)
+		protected UIElement DeconstructTitleBar()
+		{
+#if false
 			// see if we have info - if we don't we probably loaded an empty Visual Studio
-			var infoElement = (titleBarContainer as UIElement).GetElement<ContentControl>("PART_SolutionInfoControlHost");
-			if (!infoElement.HasContent)
-				throw new InvalidDataException("main-window hasn't loaded title-bar yet");
+			partInfoControlHost = titleBar.GetElement<ContentControl>("PART_SolutionInfoControlHost");
+			if (!partInfoControlHost.HasContent)
+				return null;
 
 			// get 
-			var iegrid = infoElement?.GetElement<Grid>();
+			var iegrid = partInfoControlHost.GetElement<Grid>();
 
 			var labels = iegrid
 				.GetChildren<Border>()
 				.Where(x => x.GetElement<TextBlock>() != null)
-				.Select(x => new TitleLabel(x));
+				.Select(x => new TitleInfoBlock(x));
 
-			this.titleBarBorder = infoElement?.GetElement<Border>("TextBorder");
+			this.titleBarBorder = partInfoControlHost?.GetElement<Border>("TextBorder");
 			this.titleBarTextBox = this.titleBarBorder?.GetElement<TextBlock>();
 
 			var g = new Border
@@ -294,7 +404,7 @@ namespace Atma.TitleBarNone.Models
 					Child = new TextBlock
 					{
 						Text = "atma",
-						
+
 						FontFamily = titleBarTextBox.FontFamily,
 						FontWeight = titleBarTextBox.FontWeight,
 						FontSize = titleBarTextBox.FontSize,
@@ -320,6 +430,8 @@ namespace Atma.TitleBarNone.Models
 			//g.HorizontalAlignment = HorizontalAlignment.;
 			//iegrid.SetValue(Grid.WidthProperty, Size)
 			iegrid.Children.Add(g);
+#endif
+			return null;
 		}
 
 		private Size MeasureString(TextBlock textBlock, string candidate)
@@ -337,52 +449,6 @@ namespace Atma.TitleBarNone.Models
 			return new Size(formattedText.Width, formattedText.Height);
 		}
 
-
-		public static Size MeasureTextSize(string text, FontFamily fontFamily, FontStyle fontStyle, FontWeight fontWeight, FontStretch fontStretch, double fontSize)
-		{
-			FormattedText ft = new FormattedText(text,
-												 System.Globalization.CultureInfo.CurrentCulture,
-												 FlowDirection.LeftToRight,
-												 new Typeface(fontFamily, fontStyle, fontWeight, fontStretch),
-												 fontSize,
-												 Brushes.Black,
-												 1.0);
-			return new Size(ft.Width, ft.Height);
-		}
-
-		/// <summary>
-		/// Get the required height and width of the specified text. Uses Glyph's
-		/// </summary>
-		public static Size MeasureText(string text, FontFamily fontFamily, FontStyle fontStyle, FontWeight fontWeight, FontStretch fontStretch, double fontSize)
-		{
-			Typeface typeface = new Typeface(fontFamily, fontStyle, fontWeight, fontStretch);
-			GlyphTypeface glyphTypeface;
-
-			if (!typeface.TryGetGlyphTypeface(out glyphTypeface))
-			{
-				return MeasureTextSize(text, fontFamily, fontStyle, fontWeight, fontStretch, fontSize);
-			}
-
-			int totalWidth = 0;
-			double height = 0;
-
-			for (int n = 0; n < text.Length; n++)
-			{
-				ushort glyphIndex = glyphTypeface.CharacterToGlyphMap[text[n]];
-
-				int width = (int)(glyphTypeface.AdvanceWidths[glyphIndex] * fontSize);
-
-				double glyphHeight = glyphTypeface.AdvanceHeights[glyphIndex] * fontSize;
-
-				if (glyphHeight > height)
-				{
-					height = glyphHeight;
-				}
-
-				totalWidth += width;
-			}
-
-			return new Size(totalWidth, height);
-		}
+		protected ContentControl partInfoControlHost = null;
 	}
 }
